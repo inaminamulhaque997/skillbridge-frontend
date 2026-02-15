@@ -203,12 +203,30 @@ export const hasReviewed = (bookingId: string): boolean => {
 }
 
 // Helper function to calculate end time
-const calculateEndTime = (startTime: string, duration: number): string => {
+export const calculateEndTime = (startTime: string, durationMinutes: number): string => {
   const [hours, minutes] = startTime.split(':').map(Number)
-  const totalMinutes = hours * 60 + minutes + duration
-  const endHours = Math.floor(totalMinutes / 60)
+  const totalMinutes = hours * 60 + minutes + durationMinutes
+  const endHours = Math.floor(totalMinutes / 60) % 24
   const endMinutes = totalMinutes % 60
   return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`
+}
+
+// Update booking status
+export const updateBookingStatus = (bookingId: string, status: BookingStatus): Booking | null => {
+  const bookings = getBookings()
+  const bookingIndex = bookings.findIndex(b => b.id === bookingId)
+  
+  if (bookingIndex === -1) return null
+  
+  bookings[bookingIndex].status = status
+  localStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(bookings))
+  
+  return bookings[bookingIndex]
+}
+
+// Cancel booking
+export const cancelBooking = (bookingId: string): Booking | null => {
+  return updateBookingStatus(bookingId, 'cancelled')
 }
 
 // Format time for display
