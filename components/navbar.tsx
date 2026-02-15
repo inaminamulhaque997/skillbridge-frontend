@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Menu, X, GraduationCap, User, LogOut, LayoutDashboard, Calendar, Settings, BookOpen, Clock } from 'lucide-react'
+import { NotificationsDropdown } from '@/components/notifications-dropdown'
 
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -43,16 +44,17 @@ export function Navbar() {
       case 'tutor':
         return [
           { href: '/tutor/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+          { href: '/tutor/sessions', label: 'Sessions', icon: BookOpen },
+          { href: '/tutor/earnings', label: 'Earnings', icon: Calendar },
           { href: '/tutor/availability', label: 'Availability', icon: Clock },
-          { href: '/tutor/sessions', label: 'My Sessions', icon: BookOpen },
           { href: '/tutor/profile', label: 'Profile', icon: User },
         ]
       case 'admin':
         return [
-          { href: '/admin/dashboard', label: 'Admin Dashboard', icon: LayoutDashboard },
+          { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
           { href: '/admin/users', label: 'Users', icon: User },
-          { href: '/admin/bookings', label: 'Bookings', icon: Calendar },
-          { href: '/admin/settings', label: 'Settings', icon: Settings },
+          { href: '/admin/bookings', label: 'Bookings', icon: BookOpen },
+          { href: '/admin/categories', label: 'Categories', icon: Settings },
         ]
       default:
         return []
@@ -80,6 +82,9 @@ export function Navbar() {
             
             {isAuthenticated && user ? (
               <div className="flex items-center gap-3 ml-4">
+                {/* Notifications */}
+                <NotificationsDropdown />
+                
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className="flex items-center gap-2 rounded-full hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">

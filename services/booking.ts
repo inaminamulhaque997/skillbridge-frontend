@@ -76,7 +76,7 @@ const initializeMockData = () => {
 }
 
 // Get all bookings
-const getBookings = (): Booking[] => {
+export const getBookings = (): Booking[] => {
   if (typeof window === 'undefined') return []
   
   initializeMockData()
@@ -89,14 +89,19 @@ export const getStudentBookings = (studentId: string): Booking[] => {
   return getBookings().filter((booking) => booking.studentId === studentId)
 }
 
+// Get bookings by tutor ID
+export const getTutorBookings = (tutorId: string): Booking[] => {
+  return getBookings().filter((booking) => booking.tutorId === tutorId)
+}
+
 // Get bookings by status
 export const getBookingsByStatus = (
-  studentId: string,
-  status: BookingStatus
+  userId: string,
+  status: BookingStatus,
+  userType: 'student' | 'tutor' = 'student'
 ): Booking[] => {
-  return getBookings().filter(
-    (booking) => booking.studentId === studentId && booking.status === status
-  )
+  const bookings = userType === 'tutor' ? getTutorBookings(userId) : getStudentBookings(userId)
+  return bookings.filter((booking) => booking.status === status)
 }
 
 // Create a new booking
@@ -198,12 +203,30 @@ export const hasReviewed = (bookingId: string): boolean => {
 }
 
 // Helper function to calculate end time
-const calculateEndTime = (startTime: string, duration: number): string => {
+export const calculateEndTime = (startTime: string, durationMinutes: number): string => {
   const [hours, minutes] = startTime.split(':').map(Number)
-  const totalMinutes = hours * 60 + minutes + duration
-  const endHours = Math.floor(totalMinutes / 60)
+  const totalMinutes = hours * 60 + minutes + durationMinutes
+  const endHours = Math.floor(totalMinutes / 60) % 24
   const endMinutes = totalMinutes % 60
   return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`
+}
+
+// Update booking status - allows changing status of any booking
+export const updateBookingStatus = (bookingId: string, status: BookingStatus): Booking | null => {
+  const bookings = getBookings()
+  const bookingIndex = bookings.findIndex(b => b.id === bookingId)
+  
+  if (bookingIndex === -1) return null
+  
+  bookings[bookingIndex].status = status
+  localStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(bookings))
+  
+  return bookings[bookingIndex]
+}
+
+// Cancel booking
+export const cancelBooking = (bookingId: string): Booking | null => {
+  return updateBookingStatus(bookingId, 'cancelled')
 }
 
 // Format time for display
