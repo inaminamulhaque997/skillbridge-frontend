@@ -76,7 +76,7 @@ const initializeMockData = () => {
 }
 
 // Get all bookings
-const getBookings = (): Booking[] => {
+export const getBookings = (): Booking[] => {
   if (typeof window === 'undefined') return []
   
   initializeMockData()
