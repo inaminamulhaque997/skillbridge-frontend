@@ -51,10 +51,10 @@ export function Navbar() {
         ]
       case 'admin':
         return [
-          { href: '/admin/dashboard', label: 'Admin Dashboard', icon: LayoutDashboard },
+          { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
           { href: '/admin/users', label: 'Users', icon: User },
-          { href: '/admin/bookings', label: 'Bookings', icon: Calendar },
-          { href: '/admin/settings', label: 'Settings', icon: Settings },
+          { href: '/admin/bookings', label: 'Bookings', icon: BookOpen },
+          { href: '/admin/categories', label: 'Categories', icon: Settings },
         ]
       default:
         return []
