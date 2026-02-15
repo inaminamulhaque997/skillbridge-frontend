@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/auth-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -26,7 +26,7 @@ interface FormErrors {
 }
 
 export default function RegisterPage() {
-  const router = useRouter()
+  const { login } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [role, setRole] = useState<UserRole>('student')
   const [errors, setErrors] = useState<FormErrors>({})
@@ -112,14 +112,10 @@ export default function RegisterPage() {
 
     try {
       // TODO: Replace with actual registration API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      await new Promise((resolve) => setTimeout(resolve, 1000))
       
-      // Redirect based on role
-      if (role === 'student') {
-        router.push('/dashboard')
-      } else {
-        router.push('/tutor/dashboard')
-      }
+      // After successful registration, log the user in with their chosen role
+      await login(formData.email, formData.password, role)
     } catch (error) {
       setErrors({ general: 'Registration failed. Please try again.' })
     } finally {

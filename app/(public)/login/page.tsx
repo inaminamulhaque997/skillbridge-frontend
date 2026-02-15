@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/auth-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { AlertCircle, Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
-  const router = useRouter()
+  const { login } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({})
@@ -47,15 +47,11 @@ export default function LoginPage() {
       return
     }
 
-    // Simulate API call
     setIsLoading(true)
     
     try {
-      // TODO: Replace with actual authentication logic
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      
-      // Simulate successful login
-      router.push('/dashboard')
+      // Use AuthContext login (which handles mock authentication and redirect)
+      await login(formData.email, formData.password)
     } catch (error) {
       setErrors({ general: 'Invalid email or password. Please try again.' })
     } finally {
