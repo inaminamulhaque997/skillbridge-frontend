@@ -24,7 +24,7 @@ export function ProtectedLayout({ children, allowedRoles, redirectTo = '/login' 
       } else if (!allowedRoles.includes(user.role)) {
         // Wrong role, redirect to appropriate dashboard
         if (user.role === 'admin') {
-          router.push('/admin/dashboard')
+          router.push('/admin')
         } else if (user.role === 'tutor') {
           router.push('/tutor/dashboard')
         } else {

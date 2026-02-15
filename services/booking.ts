@@ -7,8 +7,8 @@ const REVIEWS_STORAGE_KEY = 'skillbridge_reviews'
 const mockBookings: Booking[] = [
   {
     id: 'booking-1',
-    studentId: 'student-1',
-    tutorId: '1',
+    studentId: '1', // Matches student@test.com
+    tutorId: '2',
     tutorName: 'Sarah Chen',
     tutorAvatar: '/placeholder.svg?height=80&width=80',
     subject: 'Programming',
@@ -26,8 +26,8 @@ const mockBookings: Booking[] = [
   },
   {
     id: 'booking-2',
-    studentId: 'student-1',
-    tutorId: '3',
+    studentId: '1', // Matches student@test.com
+    tutorId: '2',
     tutorName: 'Emily Watson',
     tutorAvatar: '/placeholder.svg?height=80&width=80',
     subject: 'Mathematics',
@@ -45,7 +45,7 @@ const mockBookings: Booking[] = [
   },
   {
     id: 'booking-3',
-    studentId: 'student-1',
+    studentId: '1', // Matches student@test.com
     tutorId: '2',
     tutorName: 'Michael Rodriguez',
     tutorAvatar: '/placeholder.svg?height=80&width=80',
