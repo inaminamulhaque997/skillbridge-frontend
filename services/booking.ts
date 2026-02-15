@@ -211,7 +211,7 @@ export const calculateEndTime = (startTime: string, durationMinutes: number): st
   return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`
 }
 
-// Update booking status
+// Update booking status - allows changing status of any booking
 export const updateBookingStatus = (bookingId: string, status: BookingStatus): Booking | null => {
   const bookings = getBookings()
   const bookingIndex = bookings.findIndex(b => b.id === bookingId)
