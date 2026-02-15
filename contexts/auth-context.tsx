@@ -2,7 +2,17 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import type { User, AuthContextType, UserRole } from '@/types/auth'
+import type { User, UserRole } from '@/types/auth'
+import { mockLogin, mockLogout, mockGetCurrentUser, mockRegister, RegisterData } from '@/services/auth'
+
+interface AuthContextType {
+  user: User | null
+  isLoading: boolean
+  isAuthenticated: boolean
+  login: (email: string, password: string, role?: UserRole) => Promise<void>
+  register: (data: RegisterData) => Promise<void>
+  logout: () => Promise<void>
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
@@ -15,9 +25,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const storedUser = localStorage.getItem('skillbridge_user')
-        if (storedUser) {
-          setUser(JSON.parse(storedUser))
+        const currentUser = mockGetCurrentUser()
+        if (currentUser) {
+          setUser(currentUser)
         }
       } catch (error) {
         console.error('[v0] Error checking auth:', error)
@@ -30,59 +40,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = async (email: string, password: string, role?: UserRole) => {
-    setIsLoading(true)
-    
     try {
-      // TODO: Replace with actual API call
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      // Mock user data based on role
-      const mockUser: User = {
-        id: Math.random().toString(36).substring(7),
-        email,
-        name: email.split('@')[0].replace(/[._]/g, ' ').split(' ').map(word => 
-          word.charAt(0).toUpperCase() + word.slice(1)
-        ).join(' '),
-        role: role || 'student',
-        avatar: undefined,
-      }
-
-      // Store in localStorage (replace with httpOnly cookies in production)
-      localStorage.setItem('skillbridge_user', JSON.stringify(mockUser))
-      localStorage.setItem('skillbridge_token', 'mock-jwt-token')
-
-      setUser(mockUser)
+      const response = await mockLogin({ email, password, role })
+      setUser(response.user)
 
       // Redirect based on role
-      if (mockUser.role === 'admin') {
+      if (response.user.role === 'admin') {
         router.push('/admin/dashboard')
-      } else if (mockUser.role === 'tutor') {
+      } else if (response.user.role === 'tutor') {
         router.push('/tutor/dashboard')
       } else {
         router.push('/dashboard')
       }
     } catch (error) {
-      console.error('[v0] Login error:', error)
       throw error
-    } finally {
-      setIsLoading(false)
     }
   }
 
-  const logout = () => {
-    localStorage.removeItem('skillbridge_user')
-    localStorage.removeItem('skillbridge_token')
-    setUser(null)
-    router.push('/')
+  const register = async (data: RegisterData) => {
+    try {
+      const response = await mockRegister(data)
+      setUser(response.user)
+
+      // Redirect based on role
+      if (response.user.role === 'admin') {
+        router.push('/admin/dashboard')
+      } else if (response.user.role === 'tutor') {
+        router.push('/tutor/dashboard')
+      } else {
+        router.push('/dashboard')
+      }
+    } catch (error) {
+      throw error
+    }
+  }
+
+  const logout = async () => {
+    try {
+      await mockLogout()
+      setUser(null)
+      router.push('/login')
+    } catch (error) {
+      console.error('[v0] Logout error:', error)
+    }
   }
 
   const value: AuthContextType = {
     user,
     isLoading,
-    login,
-    logout,
     isAuthenticated: !!user,
+    login,
+    register,
+    logout,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

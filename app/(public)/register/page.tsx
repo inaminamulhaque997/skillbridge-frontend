@@ -26,7 +26,7 @@ interface FormErrors {
 }
 
 export default function RegisterPage() {
-  const { login } = useAuth()
+  const { register } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [role, setRole] = useState<UserRole>('student')
   const [errors, setErrors] = useState<FormErrors>({})
@@ -111,13 +111,23 @@ export default function RegisterPage() {
     setIsLoading(true)
 
     try {
-      // TODO: Replace with actual registration API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      
-      // After successful registration, log the user in with their chosen role
-      await login(formData.email, formData.password, role)
+      // Use the mock registration service
+      await register({
+        fullName: formData.fullName,
+        email: formData.email,
+        password: formData.password,
+        confirmPassword: formData.confirmPassword,
+        role,
+        educationLevel: formData.educationLevel,
+        learningGoals: formData.learningGoals,
+        expertise: formData.expertise,
+        experience: formData.experience,
+        hourlyRate: formData.hourlyRate,
+        bio: formData.bio,
+      })
     } catch (error) {
-      setErrors({ general: 'Registration failed. Please try again.' })
+      const errorMessage = error instanceof Error ? error.message : 'Registration failed. Please try again.'
+      setErrors({ general: errorMessage })
     } finally {
       setIsLoading(false)
     }
