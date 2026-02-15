@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { StarRating } from '@/components/star-rating'
+import { BookingModal } from '@/components/booking-modal'
 import { useAuth } from '@/contexts/auth-context'
 import { sampleTutorProfile } from '@/data/tutor-profile'
+import { toast } from 'sonner'
 import {
   Star,
   CheckCircle2,
@@ -35,6 +37,7 @@ export default function TutorProfilePage() {
   const [duration, setDuration] = useState(1)
   const [weekOffset, setWeekOffset] = useState(0)
   const [visibleReviews, setVisibleReviews] = useState(3)
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false)
 
   // In a real app, fetch tutor by ID from params.id
   const tutor = sampleTutorProfile
@@ -55,33 +58,31 @@ export default function TutorProfilePage() {
 
   const handleBookSession = () => {
     if (!isAuthenticated) {
-      alert('Please login as a student to book a session.')
+      toast.error('Please login as a student to book a session')
       router.push('/login')
       return
     }
 
     if (user?.role !== 'student') {
-      alert('Only students can book sessions.')
+      toast.error('Only students can book sessions')
       return
     }
 
     if (!selectedDate || !selectedTime) {
-      alert('Please select a date and time slot.')
+      toast.error('Please select a date and time slot')
       return
     }
 
-    alert(
-      `Booking session with ${tutor.name} on ${selectedDate} at ${selectedTime} for ${duration} hour(s). Total: $${calculateTotal()}`
-    )
+    setIsBookingModalOpen(true)
   }
 
   const handleMessageTutor = () => {
     if (!isAuthenticated) {
-      alert('Please login to message this tutor.')
+      toast.error('Please login to message this tutor')
       router.push('/login')
       return
     }
-    alert('Message feature coming soon!')
+    toast.info('Message feature coming soon!')
   }
 
   // Calculate rating distribution
@@ -500,6 +501,22 @@ export default function TutorProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Booking Modal */}
+      {selectedDate && selectedTime && user && (
+        <BookingModal
+          open={isBookingModalOpen}
+          onOpenChange={setIsBookingModalOpen}
+          tutorId={params.id as string}
+          tutorName={tutor.name}
+          selectedDate={selectedDate}
+          selectedTime={selectedTime}
+          duration={duration * 60} // Convert hours to minutes
+          hourlyRate={tutor.hourlyRate}
+          subjects={tutor.subjects.map(s => s.name)}
+          studentId={user.id}
+        />
+      )}
     </div>
   )
 }
