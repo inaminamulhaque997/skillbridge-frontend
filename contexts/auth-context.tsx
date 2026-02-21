@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import type { User, UserRole } from '@/types/auth'
-import { mockLogin, mockLogout, mockGetCurrentUser, mockRegister, RegisterData } from '@/services/auth'
+import { login as apiLogin, logout as apiLogout, getCurrentUser, register as apiRegister, RegisterData } from '@/services/auth'
 
 interface AuthContextType {
   user: User | null
@@ -25,12 +25,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const currentUser = mockGetCurrentUser()
+        const currentUser = await getCurrentUser()
         if (currentUser) {
           setUser(currentUser)
         }
       } catch (error) {
-        console.error('[v0] Error checking auth:', error)
+        console.error('[SkillBridge] Error checking auth:', error)
       } finally {
         setIsLoading(false)
       }
@@ -41,12 +41,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string, role?: UserRole) => {
     try {
-      const response = await mockLogin({ email, password, role })
+      const response = await apiLogin({ email, password, role })
       setUser(response.user)
 
       // Redirect based on role
       if (response.user.role === 'admin') {
-        router.push('/admin/dashboard')
+        router.push('/admin')
       } else if (response.user.role === 'tutor') {
         router.push('/tutor/dashboard')
       } else {
@@ -59,12 +59,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (data: RegisterData) => {
     try {
-      const response = await mockRegister(data)
+      const response = await apiRegister(data)
       setUser(response.user)
 
       // Redirect based on role
       if (response.user.role === 'admin') {
-        router.push('/admin/dashboard')
+        router.push('/admin')
       } else if (response.user.role === 'tutor') {
         router.push('/tutor/dashboard')
       } else {
@@ -77,11 +77,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await mockLogout()
+      await apiLogout()
       setUser(null)
       router.push('/login')
     } catch (error) {
-      console.error('[v0] Logout error:', error)
+      console.error('[SkillBridge] Logout error:', error)
     }
   }
 

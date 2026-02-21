@@ -12,7 +12,7 @@ export function middleware(request: NextRequest) {
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
   const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith('/browse'))
 
-  // Get auth token from cookie (this is a mock - in production use httpOnly cookies)
+  // Get auth token from HTTP-only cookie set by backend
   const token = request.cookies.get('skillbridge_token')?.value
 
   // If trying to access protected route without token, redirect to login
