@@ -134,10 +134,3 @@ The app uses JWT-based authentication with:
 - **Loading States** - Smooth UX with loading indicators
 - **Error Handling** - Graceful error messages and recovery
 
-## 📝 License
-
-MIT License
-
-## 👥 Authors
-
-SkillBridge Team
