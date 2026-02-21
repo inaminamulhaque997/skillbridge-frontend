@@ -3,297 +3,261 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/auth-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Checkbox } from '@/components/ui/checkbox'
-import { 
-  getTutorBookings, 
-  formatDate, 
-  formatTime, 
-  updateBookingStatus,
-  cancelBooking 
-} from '@/services/booking'
-import { Booking, BookingStatus } from '@/types/booking'
-import { 
-  Calendar,
-  Clock,
-  Video,
-  MessageSquare,
-  CheckCircle,
-  XCircle,
-  CalendarX,
-  AlertCircle,
-  List,
-  CalendarDays,
-  Filter,
-  Download
-} from 'lucide-react'
+import { getTutorBookings, formatDate, formatTime, updateBookingStatus } from '@/services/booking'
+import { Booking } from '@/types/booking'
+import { Calendar, Clock, Video, Users, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-
-type ViewMode = 'list' | 'calendar'
 
 export default function TutorSessionsPage() {
   const { user } = useAuth()
-  const [allBookings, setAllBookings] = useState<Booking[]>([])
-  const [filteredBookings, setFilteredBookings] = useState<Booking[]>([])
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'pending' | 'completed' | 'cancelled' | 'all'>('upcoming')
-  const [viewMode, setViewMode] = useState<ViewMode>('list')
-  const [selectedBookings, setSelectedBookings] = useState<string[]>([])
-  const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null)
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('pending')
+
+  const fetchBookings = async () => {
+    if (!user) return
+    
+    try {
+      const data = await getTutorBookings(user.id)
+      setBookings(data)
+    } catch (error) {
+      console.error('[SkillBridge] Error fetching bookings:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (user) {
-      const bookings = getTutorBookings(user.id)
-      setAllBookings(bookings)
-      filterBookings(bookings, activeTab)
+      fetchBookings()
     }
   }, [user])
 
-  const filterBookings = (bookings: Booking[], status: typeof activeTab) => {
-    let filtered: Booking[] = []
-    
-    switch (status) {
-      case 'upcoming':
-        filtered = bookings.filter(b => b.status === 'upcoming')
-        break
-      case 'pending':
-        // Mock pending - in real app would be separate status
-        filtered = []
-        break
-      case 'completed':
-        filtered = bookings.filter(b => b.status === 'completed')
-        break
-      case 'cancelled':
-        filtered = bookings.filter(b => b.status === 'cancelled')
-        break
-      case 'all':
-        filtered = bookings
-        break
+  // Map backend status to display status
+  const getDisplayStatus = (status: string): string => {
+    const statusMap: Record<string, string> = {
+      'pending': 'pending',
+      'confirmed': 'upcoming',
+      'completed': 'completed',
+      'cancelled': 'cancelled',
     }
-    
-    // Sort by date
-    filtered.sort((a, b) => {
-      const dateA = new Date(`${a.date}T${a.startTime}`)
-      const dateB = new Date(`${b.date}T${b.startTime}`)
-      return dateB.getTime() - dateA.getTime()
-    })
-    
-    setFilteredBookings(filtered)
+    return statusMap[status.toLowerCase()] || status
   }
 
-  const handleTabChange = (value: string) => {
-    const tab = value as typeof activeTab
-    setActiveTab(tab)
-    filterBookings(allBookings, tab)
-    setSelectedBookings([])
+  const pendingBookings = bookings.filter(b => b.status === 'pending')
+  const upcomingBookings = bookings.filter(b => b.status === 'confirmed')
+  const completedBookings = bookings.filter(b => b.status === 'completed')
+  const cancelledBookings = bookings.filter(b => b.status === 'cancelled')
+
+  const handleAcceptBooking = async (bookingId: string) => {
+    try {
+      await updateBookingStatus(bookingId, 'CONFIRMED')
+      toast.success('Booking confirmed!', {
+        description: 'The session has been added to your schedule.',
+      })
+      fetchBookings() // Refresh the list
+    } catch (error) {
+      toast.error('Failed to confirm booking', {
+        description: 'Please try again.',
+      })
+    }
   }
 
-  const handleSelectBooking = (bookingId: string) => {
-    setSelectedBookings(prev =>
-      prev.includes(bookingId)
-        ? prev.filter(id => id !== bookingId)
-        : [...prev, bookingId]
+  const handleRejectBooking = async (bookingId: string) => {
+    try {
+      await updateBookingStatus(bookingId, 'CANCELLED')
+      toast.success('Booking rejected', {
+        description: 'The booking has been cancelled.',
+      })
+      fetchBookings() // Refresh the list
+    } catch (error) {
+      toast.error('Failed to reject booking', {
+        description: 'Please try again.',
+      })
+    }
+  }
+
+  const handleCompleteBooking = async (bookingId: string) => {
+    try {
+      await updateBookingStatus(bookingId, 'COMPLETED')
+      toast.success('Session marked as completed!')
+      fetchBookings()
+    } catch (error) {
+      toast.error('Failed to update booking')
+    }
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-700 border-yellow-500">Pending</Badge>
+      case 'confirmed':
+      case 'upcoming':
+        return <Badge variant="default" className="bg-blue-500">Confirmed</Badge>
+      case 'completed':
+        return <Badge variant="default" className="bg-green-500">Completed</Badge>
+      case 'cancelled':
+        return <Badge variant="destructive">Cancelled</Badge>
+      default:
+        return <Badge variant="secondary">{status}</Badge>
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading sessions...</p>
+        </div>
+      </div>
     )
   }
 
-  const handleSelectAll = () => {
-    if (selectedBookings.length === filteredBookings.length) {
-      setSelectedBookings([])
-    } else {
-      setSelectedBookings(filteredBookings.map(b => b.id))
-    }
-  }
+  return (
+    <div className="py-12">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-foreground mb-2">My Sessions</h1>
+          <p className="text-lg text-muted-foreground">
+            Manage your tutoring sessions
+          </p>
+        </div>
 
-  const handleConfirmBooking = (booking: Booking) => {
-    updateBookingStatus(booking.id, 'upcoming')
-    toast.success('Session confirmed')
-    // Refresh bookings
-    if (user) {
-      const bookings = getTutorBookings(user.id)
-      setAllBookings(bookings)
-      filterBookings(bookings, activeTab)
-    }
-  }
+        {/* Stats */}
+        <div className="grid sm:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Pending</CardTitle>
+              <AlertCircle className="h-4 w-4 text-yellow-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{pendingBookings.length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
+              <Calendar className="h-4 w-4 text-blue-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{upcomingBookings.length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Completed</CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{completedBookings.length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Cancelled</CardTitle>
+              <XCircle className="h-4 w-4 text-red-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{cancelledBookings.length}</div>
+            </CardContent>
+          </Card>
+        </div>
 
-  const handleDeclineBooking = (booking: Booking) => {
-    setBookingToCancel(booking)
-  }
-
-  const handleCancelBooking = () => {
-    if (bookingToCancel) {
-      cancelBooking(bookingToCancel.id)
-      toast.success('Session cancelled')
-      setBookingToCancel(null)
-      
-      // Refresh bookings
-      if (user) {
-        const bookings = getTutorBookings(user.id)
-        setAllBookings(bookings)
-        filterBookings(bookings, activeTab)
-      }
-    }
-  }
-
-  const getStatusColor = (status: BookingStatus) => {
-    switch (status) {
-      case 'upcoming':
-        return 'default'
-      case 'completed':
-        return 'secondary'
-      case 'cancelled':
-        return 'destructive'
-      default:
-        return 'outline'
-    }
-  }
-
-  const getStatusIcon = (status: BookingStatus) => {
-    switch (status) {
-      case 'upcoming':
-        return <Clock className="h-3 w-3" />
-      case 'completed':
-        return <CheckCircle className="h-3 w-3" />
-      case 'cancelled':
-        return <XCircle className="h-3 w-3" />
-      default:
-        return null
-    }
-  }
-
-  const renderSessionCard = (booking: Booking) => {
-    const isPending = activeTab === 'pending'
-    const isUpcoming = booking.status === 'upcoming'
-    const isCompleted = booking.status === 'completed'
-
-    return (
-      <Card key={booking.id} className="hover:shadow-md transition-shadow">
-        <CardContent className="p-6">
-          <div className="flex items-start gap-4">
-            {/* Checkbox for bulk selection */}
-            <Checkbox
-              checked={selectedBookings.includes(booking.id)}
-              onCheckedChange={() => handleSelectBooking(booking.id)}
-              className="mt-1"
-            />
-
-            {/* Student Info */}
-            <Avatar className="h-14 w-14">
-              <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${booking.studentId}`} />
-              <AvatarFallback>
-                {booking.studentId.substring(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-
-            {/* Session Details */}
-            <div className="flex-1">
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <h3 className="font-semibold text-lg">{booking.studentId}</h3>
-                  <p className="text-sm text-muted-foreground">{booking.subject}</p>
-                </div>
-                <Badge variant={getStatusColor(booking.status)} className="capitalize gap-1">
-                  {getStatusIcon(booking.status)}
-                  {booking.status}
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 mb-3">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  {formatDate(booking.date)}
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
-                </div>
-              </div>
-
-              {booking.notes && (
-                <div className="bg-muted/50 p-3 rounded-md mb-3">
-                  <p className="text-sm text-muted-foreground italic">
-                    <span className="font-medium">Student Notes:</span> {booking.notes}
-                  </p>
-                </div>
+        {/* Sessions Tabs */}
+        <Tabs defaultValue="pending" onValueChange={setActiveTab}>
+          <TabsList className="mb-6">
+            <TabsTrigger value="pending" className="relative">
+              Pending ({pendingBookings.length})
+              {pendingBookings.length > 0 && (
+                <span className="absolute -top-1 -right-1 h-2 w-2 bg-yellow-500 rounded-full" />
               )}
+            </TabsTrigger>
+            <TabsTrigger value="upcoming">Upcoming ({upcomingBookings.length})</TabsTrigger>
+            <TabsTrigger value="completed">Completed ({completedBookings.length})</TabsTrigger>
+            <TabsTrigger value="cancelled">Cancelled ({cancelledBookings.length})</TabsTrigger>
+            <TabsTrigger value="all">All ({bookings.length})</TabsTrigger>
+          </TabsList>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2">
-                {isPending && (
-                  <>
-                    <Button 
-                      size="sm" 
-                      onClick={() => handleConfirmBooking(booking)}
-                      className="gap-2"
-                    >
-                      <CheckCircle className="h-3 w-3" />
-                      Confirm
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="destructive"
-                      onClick={() => handleDeclineBooking(booking)}
-                      className="gap-2"
-                    >
-                      <XCircle className="h-3 w-3" />
-                      Decline
-                    </Button>
-                  </>
-                )}
+          <TabsContent value="pending">
+            <SessionsList 
+              bookings={pendingBookings} 
+              getStatusBadge={getStatusBadge} 
+              showActions={true}
+              onAccept={handleAcceptBooking}
+              onReject={handleRejectBooking}
+            />
+          </TabsContent>
+          <TabsContent value="upcoming">
+            <SessionsList 
+              bookings={upcomingBookings} 
+              getStatusBadge={getStatusBadge}
+              showCompleteButton={true}
+              onComplete={handleCompleteBooking}
+            />
+          </TabsContent>
+          <TabsContent value="completed">
+            <SessionsList bookings={completedBookings} getStatusBadge={getStatusBadge} />
+          </TabsContent>
+          <TabsContent value="cancelled">
+            <SessionsList bookings={cancelledBookings} getStatusBadge={getStatusBadge} />
+          </TabsContent>
+          <TabsContent value="all">
+            <SessionsList bookings={bookings} getStatusBadge={getStatusBadge} />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  )
+}
 
-                {isUpcoming && (
-                  <>
-                    <Button size="sm" className="gap-2">
-                      <Video className="h-3 w-3" />
-                      Join Session
-                    </Button>
-                    <Button size="sm" variant="outline" className="gap-2">
-                      <MessageSquare className="h-3 w-3" />
-                      Message
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost"
-                      onClick={() => setBookingToCancel(booking)}
-                      className="gap-2"
-                    >
-                      <CalendarX className="h-3 w-3" />
-                      Cancel
-                    </Button>
-                  </>
-                )}
+interface SessionsListProps {
+  bookings: Booking[]
+  getStatusBadge: (status: string) => React.ReactNode
+  showActions?: boolean
+  showCompleteButton?: boolean
+  onAccept?: (bookingId: string) => Promise<void>
+  onReject?: (bookingId: string) => Promise<void>
+  onComplete?: (bookingId: string) => Promise<void>
+}
 
-                {isCompleted && (
-                  <>
-                    <Button size="sm" variant="outline" className="gap-2">
-                      <CheckCircle className="h-3 w-3" />
-                      View Review
-                    </Button>
-                    <Button size="sm" variant="ghost" className="gap-2">
-                      <AlertCircle className="h-3 w-3" />
-                      Report Issue
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
+function SessionsList({ 
+  bookings, 
+  getStatusBadge, 
+  showActions = false,
+  showCompleteButton = false,
+  onAccept,
+  onReject,
+  onComplete
+}: SessionsListProps) {
+  const [processingId, setProcessingId] = useState<string | null>(null)
 
-            {/* Price */}
-            <div className="text-right">
-              <p className="text-lg font-bold">${booking.totalPrice}</p>
-              <p className="text-xs text-muted-foreground">{booking.duration} min</p>
-            </div>
+  const handleAction = async (action: 'accept' | 'reject' | 'complete', bookingId: string) => {
+    setProcessingId(bookingId)
+    try {
+      if (action === 'accept' && onAccept) {
+        await onAccept(bookingId)
+      } else if (action === 'reject' && onReject) {
+        await onReject(bookingId)
+      } else if (action === 'complete' && onComplete) {
+        await onComplete(bookingId)
+      }
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  if (bookings.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-12">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">No sessions found</p>
           </div>
         </CardContent>
       </Card>
@@ -301,169 +265,86 @@ export default function TutorSessionsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-secondary/30 py-8">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-foreground mb-2">Session Management</h1>
-          <p className="text-lg text-muted-foreground">
-            Manage your tutoring sessions and bookings
-          </p>
-        </div>
-
-        {/* Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Total Sessions</p>
-              <p className="text-2xl font-bold">{allBookings.length}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Upcoming</p>
-              <p className="text-2xl font-bold">
-                {allBookings.filter(b => b.status === 'upcoming').length}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Completed</p>
-              <p className="text-2xl font-bold">
-                {allBookings.filter(b => b.status === 'completed').length}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Pending</p>
-              <p className="text-2xl font-bold">0</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Content */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Sessions</CardTitle>
-                <CardDescription>View and manage all your tutoring sessions</CardDescription>
+    <div className="space-y-4">
+      {bookings.map((booking) => (
+        <Card key={booking.id} className={showActions ? 'border-yellow-500/30 bg-yellow-50/50 dark:bg-yellow-950/10' : ''}>
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="flex flex-col items-center justify-center w-16 h-16 rounded-lg bg-primary/10 text-primary">
+                  <span className="text-xs font-medium">{formatTime(booking.startTime)}</span>
+                  <span className="text-[10px]">{booking.duration}min</span>
+                </div>
+                <div>
+                  <p className="font-semibold text-lg">{booking.subject || 'Tutoring Session'}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {formatDate(booking.date)} • {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Student ID: {booking.studentId}
+                  </p>
+                  {booking.notes && (
+                    <p className="text-sm text-muted-foreground mt-1 italic">"{booking.notes}"</p>
+                  )}
+                  <p className="text-sm font-medium mt-1">
+                    Price: ${booking.totalPrice.toFixed(2)}
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                {selectedBookings.length > 0 && (
-                  <div className="flex items-center gap-2 mr-4">
-                    <span className="text-sm text-muted-foreground">
-                      {selectedBookings.length} selected
-                    </span>
-                    <Button size="sm" variant="outline">
-                      Bulk Action
+              <div className="flex items-center gap-3">
+                {getStatusBadge(booking.status)}
+                {showActions && booking.status === 'pending' && (
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="default"
+                      onClick={() => handleAction('accept', booking.id)}
+                      disabled={processingId === booking.id}
+                    >
+                      {processingId === booking.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                      )}
+                      Accept
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="destructive"
+                      onClick={() => handleAction('reject', booking.id)}
+                      disabled={processingId === booking.id}
+                    >
+                      <XCircle className="mr-2 h-4 w-4" />
+                      Reject
                     </Button>
                   </div>
                 )}
-                
-                <Button size="sm" variant="outline" className="gap-2">
-                  <Filter className="h-4 w-4" />
-                  Filter
-                </Button>
-                <Button size="sm" variant="outline" className="gap-2">
-                  <Download className="h-4 w-4" />
-                  Export
-                </Button>
-                <div className="flex border rounded-md">
-                  <Button
-                    size="sm"
-                    variant={viewMode === 'list' ? 'default' : 'ghost'}
-                    onClick={() => setViewMode('list')}
-                    className="rounded-r-none"
+                {showCompleteButton && booking.status === 'confirmed' && (
+                  <Button 
+                    size="sm" 
+                    variant="default"
+                    onClick={() => handleAction('complete', booking.id)}
+                    disabled={processingId === booking.id}
                   >
-                    <List className="h-4 w-4" />
+                    {processingId === booking.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                    )}
+                    Complete
                   </Button>
-                  <Button
-                    size="sm"
-                    variant={viewMode === 'calendar' ? 'default' : 'ghost'}
-                    onClick={() => setViewMode('calendar')}
-                    className="rounded-l-none"
-                  >
-                    <CalendarDays className="h-4 w-4" />
+                )}
+                {booking.status === 'confirmed' && !showCompleteButton && (
+                  <Button size="sm">
+                    <Video className="mr-2 h-3 w-3" />
+                    Start Session
                   </Button>
-                </div>
+                )}
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={activeTab} onValueChange={handleTabChange}>
-              <TabsList className="grid w-full grid-cols-5 mb-6">
-                <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-                <TabsTrigger value="pending">Pending</TabsTrigger>
-                <TabsTrigger value="completed">Completed</TabsTrigger>
-                <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
-                <TabsTrigger value="all">All</TabsTrigger>
-              </TabsList>
-
-              {viewMode === 'list' && (
-                <>
-                  {filteredBookings.length > 0 && (
-                    <div className="mb-4">
-                      <Checkbox
-                        checked={selectedBookings.length === filteredBookings.length && filteredBookings.length > 0}
-                        onCheckedChange={handleSelectAll}
-                        className="mr-2"
-                      />
-                      <span className="text-sm text-muted-foreground">Select all</span>
-                    </div>
-                  )}
-
-                  <div className="space-y-4">
-                    {filteredBookings.length > 0 ? (
-                      filteredBookings.map(booking => renderSessionCard(booking))
-                    ) : (
-                      <div className="text-center py-12">
-                        <CalendarX className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold mb-2">No sessions found</h3>
-                        <p className="text-muted-foreground">
-                          {activeTab === 'pending' && 'No pending session requests at the moment'}
-                          {activeTab === 'upcoming' && 'No upcoming sessions scheduled'}
-                          {activeTab === 'completed' && 'No completed sessions yet'}
-                          {activeTab === 'cancelled' && 'No cancelled sessions'}
-                          {activeTab === 'all' && 'No sessions available'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {viewMode === 'calendar' && (
-                <div className="text-center py-12">
-                  <CalendarDays className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Calendar View</h3>
-                  <p className="text-muted-foreground">Calendar view coming soon</p>
-                </div>
-              )}
-            </Tabs>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Cancel Confirmation Dialog */}
-      <AlertDialog open={!!bookingToCancel} onOpenChange={() => setBookingToCancel(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cancel Session?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to cancel this session? This action cannot be undone and the student will be notified.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep Session</AlertDialogCancel>
-            <AlertDialogAction onClick={handleCancelBooking} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Cancel Session
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      ))}
     </div>
   )
 }

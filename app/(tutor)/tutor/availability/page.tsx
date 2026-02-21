@@ -1,346 +1,307 @@
 'use client'
 
 import { useState } from 'react'
+import { useAuth } from '@/contexts/auth-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import { 
-  Calendar, 
-  ChevronLeft, 
-  ChevronRight, 
-  Copy, 
-  Save, 
-  X,
-  Clock,
-  CalendarX
-} from 'lucide-react'
-import { toast } from 'sonner'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Calendar, Clock, Plus, Trash2, Save, AlertCircle } from 'lucide-react'
 
-type TimeSlot = {
-  time: string
-  available: boolean
-}
-
-type DaySchedule = {
+interface TimeSlot {
+  id: string
   day: string
-  date: string
-  slots: TimeSlot[]
+  startTime: string
+  endTime: string
+  enabled: boolean
 }
 
-const timeSlots = [
-  '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-  '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
-  '15:00', '15:30', '16:00', '16:30', '17:00', '17:30',
-  '18:00', '18:30', '19:00', '19:30', '20:00', '20:30'
-]
-
-const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 export default function TutorAvailabilityPage() {
-  const [currentWeek, setCurrentWeek] = useState(0)
-  const [timezone, setTimezone] = useState('America/New_York')
-  const [bulkEditMode, setBulkEditMode] = useState(false)
-  const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set())
-  const [exceptionDate, setExceptionDate] = useState('')
+  const { user } = useAuth()
+  const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [timezone, setTimezone] = useState('UTC+6')
+  const [bufferTime, setBufferTime] = useState('15')
+  const [maxSessionsPerDay, setMaxSessionsPerDay] = useState('8')
+  
+  const [slots, setSlots] = useState<TimeSlot[]>([
+    { id: '1', day: 'Monday', startTime: '09:00', endTime: '17:00', enabled: true },
+    { id: '2', day: 'Tuesday', startTime: '09:00', endTime: '17:00', enabled: true },
+    { id: '3', day: 'Wednesday', startTime: '09:00', endTime: '17:00', enabled: true },
+    { id: '4', day: 'Thursday', startTime: '09:00', endTime: '17:00', enabled: true },
+    { id: '5', day: 'Friday', startTime: '09:00', endTime: '17:00', enabled: true },
+    { id: '6', day: 'Saturday', startTime: '10:00', endTime: '14:00', enabled: false },
+    { id: '7', day: 'Sunday', startTime: '10:00', endTime: '14:00', enabled: false },
+  ])
 
-  // Initialize schedule with some availability
-  const [schedule, setSchedule] = useState<DaySchedule[]>(
-    daysOfWeek.map((day, index) => ({
-      day,
-      date: getDateForDay(index, currentWeek),
-      slots: timeSlots.map((time) => ({
-        time,
-        available: index < 5 && (time >= '09:00' && time <= '17:00'), // Weekdays 9-5 by default
-      })),
-    }))
-  )
+  const [exceptions, setExceptions] = useState([
+    { id: '1', date: '2026-02-25', reason: 'Personal appointment' },
+  ])
 
-  function getDateForDay(dayIndex: number, weekOffset: number) {
-    const today = new Date()
-    const currentDay = today.getDay()
-    const diff = dayIndex + 1 - currentDay + weekOffset * 7
-    const date = new Date(today.setDate(today.getDate() + diff))
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const toggleSlot = (id: string) => {
+    setSlots(slots.map(slot => 
+      slot.id === id ? { ...slot, enabled: !slot.enabled } : slot
+    ))
   }
 
-  const toggleSlot = (dayIndex: number, slotIndex: number) => {
-    if (bulkEditMode) {
-      const slotId = `${dayIndex}-${slotIndex}`
-      const newSelected = new Set(selectedSlots)
-      if (newSelected.has(slotId)) {
-        newSelected.delete(slotId)
-      } else {
-        newSelected.add(slotId)
-      }
-      setSelectedSlots(newSelected)
-    } else {
-      const newSchedule = [...schedule]
-      newSchedule[dayIndex].slots[slotIndex].available = 
-        !newSchedule[dayIndex].slots[slotIndex].available
-      setSchedule(newSchedule)
-    }
+  const updateSlot = (id: string, field: 'startTime' | 'endTime', value: string) => {
+    setSlots(slots.map(slot => 
+      slot.id === id ? { ...slot, [field]: value } : slot
+    ))
   }
 
-  const setBulkAvailability = (available: boolean) => {
-    const newSchedule = [...schedule]
-    selectedSlots.forEach((slotId) => {
-      const [dayIndex, slotIndex] = slotId.split('-').map(Number)
-      newSchedule[dayIndex].slots[slotIndex].available = available
-    })
-    setSchedule(newSchedule)
-    setSelectedSlots(new Set())
-    setBulkEditMode(false)
-    toast.success(`Set ${selectedSlots.size} slots to ${available ? 'available' : 'unavailable'}`)
-  }
-
-  const copyToNextWeek = () => {
-    toast.success('Schedule copied to next week')
-  }
-
-  const saveChanges = async () => {
+  const handleSave = async () => {
     setIsSaving(true)
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000))
     setIsSaving(false)
-    toast.success('Availability updated successfully')
   }
 
   const addException = () => {
-    if (exceptionDate) {
-      toast.success(`Blocked date: ${exceptionDate}`)
-      setExceptionDate('')
-    }
+    setExceptions([
+      ...exceptions,
+      { id: Date.now().toString(), date: '', reason: '' }
+    ])
   }
 
-  const navigateWeek = (direction: number) => {
-    const newWeek = currentWeek + direction
-    setCurrentWeek(newWeek)
-    setSchedule(
-      daysOfWeek.map((day, index) => ({
-        day,
-        date: getDateForDay(index, newWeek),
-        slots: timeSlots.map((time) => ({
-          time,
-          available: index < 5 && (time >= '09:00' && time <= '17:00'),
-        })),
-      }))
-    )
+  const removeException = (id: string) => {
+    setExceptions(exceptions.filter(e => e.id !== id))
   }
 
   return (
     <div className="py-12">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-foreground mb-2">Manage Availability</h1>
+          <h1 className="text-4xl font-bold text-foreground mb-2">Availability</h1>
           <p className="text-lg text-muted-foreground">
-            Set your weekly schedule and availability preferences
+            Set your teaching hours and manage your schedule
           </p>
         </div>
 
-        {/* Controls */}
-        <div className="flex flex-col lg:flex-row gap-4 mb-6">
-          <Card className="flex-1">
-            <CardContent className="p-4 flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => navigateWeek(-1)}
-                >
-                  <ChevronLeft className="h-4 w-4" />
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Weekly Schedule */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Weekly Schedule
+                </CardTitle>
+                <CardDescription>
+                  Set your available hours for each day of the week
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {slots.map((slot) => (
+                  <div 
+                    key={slot.id} 
+                    className={`flex flex-col sm:flex-row sm:items-center gap-4 p-4 border rounded-lg ${!slot.enabled ? 'bg-muted/50' : ''}`}
+                  >
+                    <div className="flex items-center justify-between sm:w-32">
+                      <span className="font-medium">{slot.day}</span>
+                      <Switch
+                        checked={slot.enabled}
+                        onCheckedChange={() => toggleSlot(slot.id)}
+                      />
+                    </div>
+                    
+                    {slot.enabled && (
+                      <div className="flex items-center gap-2 flex-1">
+                        <Input
+                          type="time"
+                          value={slot.startTime}
+                          onChange={(e) => updateSlot(slot.id, 'startTime', e.target.value)}
+                          className="w-32"
+                        />
+                        <span className="text-muted-foreground">to</span>
+                        <Input
+                          type="time"
+                          value={slot.endTime}
+                          onChange={(e) => updateSlot(slot.id, 'endTime', e.target.value)}
+                          className="w-32"
+                        />
+                      </div>
+                    )}
+                    
+                    {!slot.enabled && (
+                      <span className="text-sm text-muted-foreground">Unavailable</span>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* Exceptions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5" />
+                  Date Exceptions
+                </CardTitle>
+                <CardDescription>
+                  Block specific dates when you're not available
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {exceptions.map((exception) => (
+                  <div key={exception.id} className="flex items-center gap-4 p-3 border rounded-lg">
+                    <Input
+                      type="date"
+                      value={exception.date}
+                      onChange={(e) => setExceptions(exceptions.map(ex => 
+                        ex.id === exception.id ? { ...ex, date: e.target.value } : ex
+                      ))}
+                      className="w-40"
+                    />
+                    <Input
+                      placeholder="Reason (optional)"
+                      value={exception.reason}
+                      onChange={(e) => setExceptions(exceptions.map(ex => 
+                        ex.id === exception.id ? { ...ex, reason: e.target.value } : ex
+                      ))}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeException(exception.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+                
+                <Button variant="outline" onClick={addException}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Exception
                 </Button>
-                <div className="text-center min-w-[200px]">
-                  <p className="text-sm font-medium">
-                    {currentWeek === 0
-                      ? 'This Week'
-                      : currentWeek > 0
-                      ? `${currentWeek} week${currentWeek > 1 ? 's' : ''} ahead`
-                      : `${Math.abs(currentWeek)} week${Math.abs(currentWeek) > 1 ? 's' : ''} ago`}
-                  </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Settings</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="timezone">Timezone</Label>
+                  <Select value={timezone} onValueChange={setTimezone}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="UTC+6">UTC+6 (Dhaka)</SelectItem>
+                      <SelectItem value="UTC+5">UTC+5 (Karachi)</SelectItem>
+                      <SelectItem value="UTC+5:30">UTC+5:30 (Mumbai)</SelectItem>
+                      <SelectItem value="UTC+8">UTC+8 (Singapore)</SelectItem>
+                      <SelectItem value="UTC+0">UTC+0 (London)</SelectItem>
+                      <SelectItem value="UTC-5">UTC-5 (New York)</SelectItem>
+                      <SelectItem value="UTC-8">UTC-8 (Los Angeles)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => navigateWeek(1)}
+
+                <div className="space-y-2">
+                  <Label htmlFor="buffer">Buffer Time Between Sessions</Label>
+                  <Select value={bufferTime} onValueChange={setBufferTime}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">No buffer</SelectItem>
+                      <SelectItem value="5">5 minutes</SelectItem>
+                      <SelectItem value="10">10 minutes</SelectItem>
+                      <SelectItem value="15">15 minutes</SelectItem>
+                      <SelectItem value="30">30 minutes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="maxSessions">Max Sessions Per Day</Label>
+                  <Select value={maxSessionsPerDay} onValueChange={setMaxSessionsPerDay}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="4">4 sessions</SelectItem>
+                      <SelectItem value="6">6 sessions</SelectItem>
+                      <SelectItem value="8">8 sessions</SelectItem>
+                      <SelectItem value="10">10 sessions</SelectItem>
+                      <SelectItem value="unlimited">Unlimited</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => setSlots(slots.map(s => ({ ...s, enabled: true, startTime: '09:00', endTime: '17:00' })))}
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <Clock className="mr-2 h-4 w-4" />
+                  Set 9-5 All Weekdays
                 </Button>
-              </div>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => setSlots(slots.map(s => ({ ...s, enabled: false })))}
+                >
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Clear All Availability
+                </Button>
+              </CardContent>
+            </Card>
 
-              <div className="flex items-center gap-2 ml-auto">
-                <Label htmlFor="timezone" className="text-sm whitespace-nowrap">
-                  Timezone:
-                </Label>
-                <Select value={timezone} onValueChange={setTimezone}>
-                  <SelectTrigger id="timezone" className="w-[200px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="America/New_York">EST (GMT-5)</SelectItem>
-                    <SelectItem value="America/Chicago">CST (GMT-6)</SelectItem>
-                    <SelectItem value="America/Denver">MST (GMT-7)</SelectItem>
-                    <SelectItem value="America/Los_Angeles">PST (GMT-8)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4 flex flex-wrap items-center gap-2">
-              {bulkEditMode ? (
+            {/* Save Button */}
+            <Button 
+              className="w-full" 
+              size="lg"
+              onClick={handleSave}
+              disabled={isSaving}
+            >
+              {isSaving ? (
                 <>
-                  <Badge variant="secondary">
-                    {selectedSlots.size} slots selected
-                  </Badge>
-                  <Button
-                    size="sm"
-                    onClick={() => setBulkAvailability(true)}
-                    disabled={selectedSlots.size === 0}
-                  >
-                    Set Available
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setBulkAvailability(false)}
-                    disabled={selectedSlots.size === 0}
-                  >
-                    Set Unavailable
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setBulkEditMode(false)
-                      setSelectedSlots(new Set())
-                    }}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Saving...
                 </>
               ) : (
                 <>
-                  <Button size="sm" variant="outline" onClick={() => setBulkEditMode(true)}>
-                    <Clock className="mr-2 h-4 w-4" />
-                    Bulk Edit
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={copyToNextWeek}>
-                    <Copy className="mr-2 h-4 w-4" />
-                    Copy to Next Week
-                  </Button>
-                  <Button size="sm" onClick={saveChanges} disabled={isSaving}>
-                    <Save className="mr-2 h-4 w-4" />
-                    {isSaving ? 'Saving...' : 'Save Changes'}
-                  </Button>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Availability
                 </>
               )}
-            </CardContent>
-          </Card>
+            </Button>
+
+            {/* Info */}
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="p-4">
+                <p className="text-sm text-blue-800">
+                  <strong>Tip:</strong> Students can only book sessions during your available hours. 
+                  Make sure to keep your schedule updated to avoid missed bookings.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-
-        {/* Calendar Grid */}
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <div className="min-w-[900px]">
-                {/* Header Row */}
-                <div className="grid grid-cols-8 border-b bg-muted/50">
-                  <div className="p-3 text-sm font-medium">Time</div>
-                  {schedule.map((day) => (
-                    <div key={day.day} className="p-3 text-center border-l">
-                      <div className="text-sm font-medium">{day.day.substring(0, 3)}</div>
-                      <div className="text-xs text-muted-foreground">{day.date}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Time Slots */}
-                <div className="max-h-[600px] overflow-y-auto">
-                  {timeSlots.map((time, slotIndex) => (
-                    <div
-                      key={time}
-                      className="grid grid-cols-8 border-b hover:bg-accent/5 transition-colors"
-                    >
-                      <div className="p-3 text-sm font-medium text-muted-foreground">
-                        {time}
-                      </div>
-                      {schedule.map((day, dayIndex) => {
-                        const slot = day.slots[slotIndex]
-                        const slotId = `${dayIndex}-${slotIndex}`
-                        const isSelected = selectedSlots.has(slotId)
-
-                        return (
-                          <button
-                            key={`${day.day}-${time}`}
-                            onClick={() => toggleSlot(dayIndex, slotIndex)}
-                            className={`p-3 border-l transition-all ${
-                              bulkEditMode
-                                ? isSelected
-                                  ? 'bg-blue-100 dark:bg-blue-900/30 ring-2 ring-blue-500 ring-inset'
-                                  : 'hover:bg-accent'
-                                : slot.available
-                                ? 'bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50'
-                                : 'bg-secondary hover:bg-accent'
-                            }`}
-                          >
-                            {bulkEditMode ? (
-                              isSelected && (
-                                <div className="flex items-center justify-center">
-                                  <Checkbox checked className="pointer-events-none" />
-                                </div>
-                              )
-                            ) : (
-                              slot.available && (
-                                <div className="text-xs font-medium text-green-700 dark:text-green-400">
-                                  ✓
-                                </div>
-                              )
-                            )}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Exception Dates */}
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Exception Dates</CardTitle>
-            <CardDescription>Block specific dates (vacations, holidays, etc.)</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2">
-              <Input
-                type="date"
-                value={exceptionDate}
-                onChange={(e) => setExceptionDate(e.target.value)}
-                className="max-w-xs"
-              />
-              <Button onClick={addException} disabled={!exceptionDate}>
-                <CalendarX className="mr-2 h-4 w-4" />
-                Block Date
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   )

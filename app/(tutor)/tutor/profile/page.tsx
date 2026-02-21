@@ -3,591 +3,384 @@
 import { useState } from 'react'
 import { useAuth } from '@/contexts/auth-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
+import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 import { 
-  Upload, 
-  Save, 
-  Eye, 
-  Plus, 
-  X, 
-  FileVideo,
-  CheckCircle,
-  Loader2
+  User, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  GraduationCap, 
+  Briefcase, 
+  DollarSign,
+  Save,
+  Camera,
+  Star
 } from 'lucide-react'
-import { toast } from 'sonner'
 
-type Subject = {
-  name: string
-  expertise: 'beginner' | 'intermediate' | 'expert'
-}
-
-type Education = {
-  id: string
-  degree: string
-  institution: string
-  year: string
-}
-
-export default function TutorProfileEditPage() {
+export default function TutorProfilePage() {
   const { user } = useAuth()
   const [isSaving, setIsSaving] = useState(false)
-  const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
-  const [showPreview, setShowPreview] = useState(false)
-
-  // Profile data
-  const [profileData, setProfileData] = useState({
-    displayName: user?.name || '',
-    headline: 'Experienced Math Tutor | PhD in Mathematics',
-    bio: `Passionate educator with 10+ years of experience helping students excel in mathematics. 
-    
-I specialize in breaking down complex concepts into easy-to-understand lessons. My teaching approach is personalized and student-centered, ensuring that each session is productive and engaging.
-
-My students consistently improve their grades and develop a genuine appreciation for math.`,
+  
+  const [profile, setProfile] = useState({
+    name: user?.name || '',
+    email: user?.email || '',
+    phone: '+1 (555) 123-4567',
+    location: 'New York, USA',
+    bio: 'Passionate educator with 5+ years of experience in teaching programming and mathematics. I believe in making complex concepts simple and accessible for all students.',
     hourlyRate: '45',
-    currency: 'USD',
-    videoUrl: '',
-    subjects: [
-      { name: 'Mathematics', expertise: 'expert' as const },
-      { name: 'Calculus', expertise: 'expert' as const },
-      { name: 'Algebra', expertise: 'expert' as const },
-    ],
-    education: [
-      { id: '1', degree: 'PhD in Mathematics', institution: 'MIT', year: '2015' },
-      { id: '2', degree: 'MS in Mathematics', institution: 'Stanford University', year: '2012' },
-    ],
-    teachingStyles: ['Visual', 'Hands-on', 'Patient', 'Structured'],
+    education: 'M.S. Computer Science, Stanford University',
+    subjects: ['JavaScript', 'Python', 'React', 'Node.js', 'Mathematics'],
+    experience: '5 years of teaching experience',
+    languages: ['English', 'Spanish'],
   })
 
-  const [newSubject, setNewSubject] = useState({ name: '', expertise: 'intermediate' as const })
-  const [newEducation, setNewEducation] = useState({ degree: '', institution: '', year: '' })
-
-  const teachingStyleOptions = [
-    'Visual',
-    'Hands-on',
-    'Patient',
-    'Structured',
-    'Interactive',
-    'Flexible',
-    'Encouraging',
-    'Detail-oriented',
-  ]
+  const [subjects, setSubjects] = useState(profile.subjects.join(', '))
+  const [newSubject, setNewSubject] = useState('')
 
   const handleSave = async () => {
     setIsSaving(true)
-    setAutoSaveStatus('saving')
-    
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
+    await new Promise(resolve => setTimeout(resolve, 1000))
     setIsSaving(false)
-    setAutoSaveStatus('saved')
-    toast.success('Profile updated successfully!')
-    
-    setTimeout(() => {
-      setAutoSaveStatus('unsaved')
-    }, 3000)
   }
 
-  const addSubject = () => {
-    if (newSubject.name) {
-      setProfileData({
-        ...profileData,
-        subjects: [...profileData.subjects, newSubject],
-      })
-      setNewSubject({ name: '', expertise: 'intermediate' })
-      toast.success('Subject added')
-    }
-  }
-
-  const removeSubject = (index: number) => {
-    setProfileData({
-      ...profileData,
-      subjects: profileData.subjects.filter((_, i) => i !== index),
-    })
-  }
-
-  const addEducation = () => {
-    if (newEducation.degree && newEducation.institution) {
-      setProfileData({
-        ...profileData,
-        education: [
-          ...profileData.education,
-          { ...newEducation, id: Date.now().toString() },
-        ],
-      })
-      setNewEducation({ degree: '', institution: '', year: '' })
-      toast.success('Education added')
-    }
-  }
-
-  const removeEducation = (id: string) => {
-    setProfileData({
-      ...profileData,
-      education: profileData.education.filter((e) => e.id !== id),
-    })
-  }
-
-  const toggleTeachingStyle = (style: string) => {
-    if (profileData.teachingStyles.includes(style)) {
-      setProfileData({
-        ...profileData,
-        teachingStyles: profileData.teachingStyles.filter((s) => s !== style),
-      })
-    } else {
-      setProfileData({
-        ...profileData,
-        teachingStyles: [...profileData.teachingStyles, style],
-      })
-    }
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
   }
 
   return (
     <div className="py-12">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-foreground mb-2">Edit Profile</h1>
-            <p className="text-lg text-muted-foreground">
-              Update your public tutor profile information
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {autoSaveStatus === 'saved' && (
-              <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
-                <CheckCircle className="h-4 w-4" />
-                <span>All changes saved</span>
-              </div>
-            )}
-            {autoSaveStatus === 'saving' && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Saving...</span>
-              </div>
-            )}
-            <Button
-              variant="outline"
-              onClick={() => setShowPreview(!showPreview)}
-            >
-              <Eye className="mr-2 h-4 w-4" />
-              {showPreview ? 'Edit Mode' : 'Preview'}
-            </Button>
-            <Button onClick={handleSave} disabled={isSaving}>
-              <Save className="mr-2 h-4 w-4" />
-              {isSaving ? 'Saving...' : 'Publish Changes'}
-            </Button>
-          </div>
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-foreground mb-2">Profile Settings</h1>
+          <p className="text-lg text-muted-foreground">
+            Manage your tutor profile and preferences
+          </p>
         </div>
 
-        {showPreview ? (
-          /* Preview Mode */
-          <Card>
-            <CardContent className="p-8">
-              <div className="flex flex-col md:flex-row gap-8">
-                <div className="flex flex-col items-center gap-4">
-                  <Avatar className="h-32 w-32">
-                    <AvatarImage src={user?.avatar} alt={profileData.displayName} />
-                    <AvatarFallback className="text-3xl">
-                      {profileData.displayName.split(' ').map((n) => n[0]).join('')}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="text-center">
-                    <h2 className="text-2xl font-bold">{profileData.displayName}</h2>
-                    <p className="text-muted-foreground">{profileData.headline}</p>
-                  </div>
-                </div>
-
-                <div className="flex-1 space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">About</h3>
-                    <p className="text-muted-foreground whitespace-pre-line leading-relaxed">
-                      {profileData.bio}
-                    </p>
-                  </div>
-
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3">Subjects & Expertise</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {profileData.subjects.map((subject, index) => (
-                        <Badge key={index} variant="secondary" className="text-sm">
-                          {subject.name} • {subject.expertise}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3">Teaching Style</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {profileData.teachingStyles.map((style) => (
-                        <Badge key={style} variant="outline">
-                          {style}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3">Education</h3>
-                    <div className="space-y-3">
-                      {profileData.education.map((edu) => (
-                        <div key={edu.id} className="border-l-2 border-primary pl-4">
-                          <p className="font-semibold">{edu.degree}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {edu.institution} • {edu.year}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-2xl font-bold text-primary">
-                      ${profileData.hourlyRate}
-                      <span className="text-sm text-muted-foreground font-normal">/hour</span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          /* Edit Mode */
-          <Tabs defaultValue="basic" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="basic">Basic Info</TabsTrigger>
-              <TabsTrigger value="subjects">Subjects</TabsTrigger>
-              <TabsTrigger value="education">Education</TabsTrigger>
-              <TabsTrigger value="media">Media</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="basic" className="space-y-6">
-              {/* Profile Photo */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Profile Photo</CardTitle>
-                  <CardDescription>
-                    Upload a professional photo (recommended size: 400x400px)
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-6">
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Basic Info */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Basic Information
+                </CardTitle>
+                <CardDescription>
+                  Your personal details and contact information
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-6 mb-6">
+                  <div className="relative">
                     <Avatar className="h-24 w-24">
-                      <AvatarImage src={user?.avatar} alt={profileData.displayName} />
-                      <AvatarFallback className="text-2xl">
-                        {profileData.displayName.split(' ').map((n) => n[0]).join('')}
+                      <AvatarImage src={user?.avatar} alt={profile.name} />
+                      <AvatarFallback className="text-2xl bg-primary/10 text-primary">
+                        {getInitials(profile.name)}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex-1">
-                      <Button variant="outline">
-                        <Upload className="mr-2 h-4 w-4" />
-                        Upload Photo
-                      </Button>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        JPG, PNG or GIF. Max size 5MB.
-                      </p>
+                    <Button 
+                      size="icon" 
+                      variant="outline" 
+                      className="absolute bottom-0 right-0 rounded-full h-8 w-8"
+                    >
+                      <Camera className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">{profile.name}</h3>
+                    <p className="text-sm text-muted-foreground">{profile.email}</p>
+                    <div className="flex items-center gap-1 mt-1">
+                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <span className="text-sm font-medium">4.9</span>
+                      <span className="text-sm text-muted-foreground">(89 reviews)</span>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
 
-              {/* Basic Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Basic Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="displayName">Display Name</Label>
+                    <Label htmlFor="name">Full Name</Label>
                     <Input
-                      id="displayName"
-                      value={profileData.displayName}
-                      onChange={(e) =>
-                        setProfileData({ ...profileData, displayName: e.target.value })
-                      }
+                      id="name"
+                      value={profile.name}
+                      onChange={(e) => setProfile({ ...profile, name: e.target.value })}
                     />
                   </div>
-
                   <div className="space-y-2">
-                    <Label htmlFor="headline">Headline</Label>
+                    <Label htmlFor="email">Email</Label>
                     <Input
-                      id="headline"
-                      value={profileData.headline}
-                      onChange={(e) =>
-                        setProfileData({ ...profileData, headline: e.target.value })
-                      }
-                      placeholder="e.g., Experienced Math Tutor | PhD in Mathematics"
+                      id="email"
+                      type="email"
+                      value={profile.email}
+                      onChange={(e) => setProfile({ ...profile, email: e.target.value })}
                     />
                   </div>
-
                   <div className="space-y-2">
-                    <Label htmlFor="bio">Bio</Label>
-                    <Textarea
-                      id="bio"
-                      value={profileData.bio}
-                      onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
-                      rows={8}
-                      placeholder="Tell students about your teaching experience, approach, and what makes you unique..."
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input
+                      id="phone"
+                      value={profile.phone}
+                      onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
                     />
-                    <p className="text-xs text-muted-foreground">
-                      {profileData.bio.length} characters
-                    </p>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="location">Location</Label>
+                    <Input
+                      id="location"
+                      value={profile.location}
+                      onChange={(e) => setProfile({ ...profile, location: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="hourlyRate">Hourly Rate</Label>
+            {/* Professional Info */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <GraduationCap className="h-5 w-5" />
+                  Professional Information
+                </CardTitle>
+                <CardDescription>
+                  Your teaching background and expertise
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="bio">Bio</Label>
+                  <Textarea
+                    id="bio"
+                    rows={4}
+                    value={profile.bio}
+                    onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+                    placeholder="Tell students about yourself..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="education">Education</Label>
+                  <Input
+                    id="education"
+                    value={profile.education}
+                    onChange={(e) => setProfile({ ...profile, education: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="experience">Experience</Label>
+                  <Input
+                    id="experience"
+                    value={profile.experience}
+                    onChange={(e) => setProfile({ ...profile, experience: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Subjects</Label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {profile.subjects.map((subject) => (
+                      <Badge key={subject} variant="secondary" className="text-sm">
+                        {subject}
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Add a subject"
+                      value={newSubject}
+                      onChange={(e) => setNewSubject(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && newSubject.trim()) {
+                          setProfile({
+                            ...profile,
+                            subjects: [...profile.subjects, newSubject.trim()]
+                          })
+                          setNewSubject('')
+                        }
+                      }}
+                    />
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        if (newSubject.trim()) {
+                          setProfile({
+                            ...profile,
+                            subjects: [...profile.subjects, newSubject.trim()]
+                          })
+                          setNewSubject('')
+                        }
+                      }}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="languages">Languages</Label>
+                  <Input
+                    id="languages"
+                    value={profile.languages.join(', ')}
+                    onChange={(e) => setProfile({ ...profile, languages: e.target.value.split(', ') })}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Pricing */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Pricing
+                </CardTitle>
+                <CardDescription>
+                  Set your hourly rate for tutoring sessions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4">
+                  <div className="space-y-2 flex-1">
+                    <Label htmlFor="hourlyRate">Hourly Rate (USD)</Label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="hourlyRate"
                         type="number"
-                        value={profileData.hourlyRate}
-                        onChange={(e) =>
-                          setProfileData({ ...profileData, hourlyRate: e.target.value })
-                        }
+                        value={profile.hourlyRate}
+                        onChange={(e) => setProfile({ ...profile, hourlyRate: e.target.value })}
+                        className="pl-10"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="currency">Currency</Label>
-                      <Select value={profileData.currency} onValueChange={(value) =>
-                        setProfileData({ ...profileData, currency: value })
-                      }>
-                        <SelectTrigger id="currency">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="USD">USD ($)</SelectItem>
-                          <SelectItem value="EUR">EUR (€)</SelectItem>
-                          <SelectItem value="GBP">GBP (£)</SelectItem>
-                          <SelectItem value="CAD">CAD ($)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* Teaching Style */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Teaching Style</CardTitle>
-                  <CardDescription>
-                    Select tags that describe your teaching approach
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    {teachingStyleOptions.map((style) => (
-                      <div key={style} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`style-${style}`}
-                          checked={profileData.teachingStyles.includes(style)}
-                          onCheckedChange={() => toggleTeachingStyle(style)}
-                        />
-                        <label htmlFor={`style-${style}`} className="text-sm cursor-pointer">
-                          {style}
-                        </label>
-                      </div>
-                    ))}
+                  <div className="pt-8">
+                    <p className="text-sm text-muted-foreground">
+                      Platform fee: <span className="font-medium">10%</span>
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      You earn: <span className="font-medium text-green-600">${(Number(profile.hourlyRate) * 0.9).toFixed(2)}/hr</span>
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-            <TabsContent value="subjects" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Subjects You Teach</CardTitle>
-                  <CardDescription>
-                    Add subjects and specify your expertise level
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Existing Subjects */}
-                  <div className="space-y-3">
-                    {profileData.subjects.map((subject, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-4 border rounded-lg"
-                      >
-                        <div>
-                          <p className="font-medium">{subject.name}</p>
-                          <Badge variant="secondary" className="mt-1 text-xs">
-                            {subject.expertise}
-                          </Badge>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeSubject(index)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Save Button */}
+            <Button 
+              className="w-full" 
+              size="lg"
+              onClick={handleSave}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+
+            {/* Profile Completion */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Profile Completion</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Progress</span>
+                    <span className="font-medium">85%</span>
                   </div>
-
-                  {/* Add New Subject */}
-                  <div className="border-t pt-4">
-                    <p className="font-medium mb-3">Add Subject</p>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Subject name"
-                        value={newSubject.name}
-                        onChange={(e) =>
-                          setNewSubject({ ...newSubject, name: e.target.value })
-                        }
-                      />
-                      <Select
-                        value={newSubject.expertise}
-                        onValueChange={(value: any) =>
-                          setNewSubject({ ...newSubject, expertise: value })
-                        }
-                      >
-                        <SelectTrigger className="w-[180px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="beginner">Beginner</SelectItem>
-                          <SelectItem value="intermediate">Intermediate</SelectItem>
-                          <SelectItem value="expert">Expert</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button onClick={addSubject}>
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                    <div className="h-full bg-primary rounded-full" style={{ width: '85%' }} />
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="education" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Education & Certifications</CardTitle>
-                  <CardDescription>
-                    Add your educational background and certifications
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Existing Education */}
-                  <div className="space-y-3">
-                    {profileData.education.map((edu) => (
-                      <div
-                        key={edu.id}
-                        className="flex items-start justify-between p-4 border rounded-lg"
-                      >
-                        <div>
-                          <p className="font-medium">{edu.degree}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {edu.institution}
-                          </p>
-                          <p className="text-sm text-muted-foreground">{edu.year}</p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeEducation(edu.id)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center gap-2 text-green-600">
+                    <div className="h-2 w-2 rounded-full bg-green-500" />
+                    Basic information complete
                   </div>
-
-                  {/* Add New Education */}
-                  <div className="border-t pt-4">
-                    <p className="font-medium mb-3">Add Education</p>
-                    <div className="space-y-3">
-                      <Input
-                        placeholder="Degree/Certification"
-                        value={newEducation.degree}
-                        onChange={(e) =>
-                          setNewEducation({ ...newEducation, degree: e.target.value })
-                        }
-                      />
-                      <Input
-                        placeholder="Institution"
-                        value={newEducation.institution}
-                        onChange={(e) =>
-                          setNewEducation({ ...newEducation, institution: e.target.value })
-                        }
-                      />
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Year"
-                          value={newEducation.year}
-                          onChange={(e) =>
-                            setNewEducation({ ...newEducation, year: e.target.value })
-                          }
-                          className="flex-1"
-                        />
-                        <Button onClick={addEducation}>
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add
-                        </Button>
-                      </div>
-                    </div>
+                  <div className="flex items-center gap-2 text-green-600">
+                    <div className="h-2 w-2 rounded-full bg-green-500" />
+                    Professional details added
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="media" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Video Introduction</CardTitle>
-                  <CardDescription>
-                    Add a video URL (YouTube or Vimeo) to introduce yourself to students
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="videoUrl">Video URL</Label>
-                    <Input
-                      id="videoUrl"
-                      placeholder="https://youtube.com/watch?v=..."
-                      value={profileData.videoUrl}
-                      onChange={(e) =>
-                        setProfileData({ ...profileData, videoUrl: e.target.value })
-                      }
-                    />
+                  <div className="flex items-center gap-2 text-green-600">
+                    <div className="h-2 w-2 rounded-full bg-green-500" />
+                    Subjects configured
                   </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <div className="h-2 w-2 rounded-full bg-muted" />
+                    Add a profile photo
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <div className="h-2 w-2 rounded-full bg-muted" />
+                    Upload credentials
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-                  {profileData.videoUrl ? (
-                    <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-                      <div className="text-center">
-                        <FileVideo className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">Video Preview</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="aspect-video border-2 border-dashed rounded-lg flex items-center justify-center">
-                      <div className="text-center">
-                        <FileVideo className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">No video added yet</p>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        )}
+            {/* Notifications */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Notifications</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="email-notif" className="text-sm">Email notifications</Label>
+                  <Switch id="email-notif" defaultChecked />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="sms-notif" className="text-sm">SMS reminders</Label>
+                  <Switch id="sms-notif" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="booking-notif" className="text-sm">Booking alerts</Label>
+                  <Switch id="booking-notif" defaultChecked />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Danger Zone */}
+            <Card className="border-destructive/50">
+              <CardHeader>
+                <CardTitle className="text-destructive">Danger Zone</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button variant="outline" className="w-full">
+                  Deactivate Account
+                </Button>
+                <Button variant="destructive" className="w-full">
+                  Delete Account
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   )

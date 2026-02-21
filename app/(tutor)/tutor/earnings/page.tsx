@@ -3,376 +3,307 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/auth-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { getTutorBookings } from '@/services/booking'
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Progress } from '@/components/ui/progress'
+import { getTutorBookings, formatDate } from '@/services/booking'
 import { Booking } from '@/types/booking'
-import { 
-  DollarSign,
-  TrendingUp,
-  Clock,
-  Download,
-  Calendar,
-  CreditCard,
-  ArrowUpRight,
-  FileText
-} from 'lucide-react'
-import { toast } from 'sonner'
-
-interface Transaction {
-  id: string
-  date: string
-  studentName: string
-  subject: string
-  duration: number
-  amount: number
-  status: 'paid' | 'pending' | 'processing'
-  bookingId: string
-}
+import { DollarSign, TrendingUp, TrendingDown, Calendar, Download, ArrowUpRight, Wallet, LineChart } from 'lucide-react'
 
 export default function TutorEarningsPage() {
   const { user } = useAuth()
   const [bookings, setBookings] = useState<Booking[]>([])
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [dateFilter, setDateFilter] = useState({ from: '', to: '' })
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    const fetchBookings = async () => {
+      if (!user) return
+      
+      try {
+        const data = await getTutorBookings(user.id)
+        setBookings(data)
+      } catch (error) {
+        console.error('[SkillBridge] Error fetching bookings:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
     if (user) {
-      const tutorBookings = getTutorBookings(user.id)
-      setBookings(tutorBookings)
-
-      // Convert bookings to transactions
-      const txns: Transaction[] = tutorBookings
-        .filter(b => b.status === 'completed' || b.status === 'upcoming')
-        .map(b => ({
-          id: b.id,
-          date: b.date,
-          studentName: b.studentId,
-          subject: b.subject,
-          duration: b.duration,
-          amount: b.totalPrice,
-          status: b.status === 'completed' ? 'paid' : 'pending',
-          bookingId: b.id
-        }))
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-
-      setTransactions(txns)
+      fetchBookings()
     }
   }, [user])
 
-  // Calculate earnings
   const completedBookings = bookings.filter(b => b.status === 'completed')
+  
+  // Calculate earnings
   const totalEarnings = completedBookings.reduce((sum, b) => sum + b.totalPrice, 0)
   
-  const thisMonth = new Date()
-  const monthlyEarnings = completedBookings.filter(b => {
+  const now = new Date()
+  const thisMonthBookings = completedBookings.filter(b => {
     const bookingDate = new Date(b.date)
-    return bookingDate.getMonth() === thisMonth.getMonth() &&
-           bookingDate.getFullYear() === thisMonth.getFullYear()
-  }).reduce((sum, b) => sum + b.totalPrice, 0)
-
-  const pendingEarnings = bookings
-    .filter(b => b.status === 'upcoming')
-    .reduce((sum, b) => sum + b.totalPrice, 0)
-
-  const withdrawableEarnings = totalEarnings * 0.85 // Mock: 85% after platform fee
-
-  // Filter transactions by date
-  const filteredTransactions = transactions.filter(txn => {
-    if (!dateFilter.from && !dateFilter.to) return true
-    const txnDate = new Date(txn.date)
-    const from = dateFilter.from ? new Date(dateFilter.from) : null
-    const to = dateFilter.to ? new Date(dateFilter.to) : null
-    
-    if (from && to) {
-      return txnDate >= from && txnDate <= to
-    } else if (from) {
-      return txnDate >= from
-    } else if (to) {
-      return txnDate <= to
-    }
-    return true
+    return bookingDate.getMonth() === now.getMonth() && 
+           bookingDate.getFullYear() === now.getFullYear()
   })
+  const thisMonthEarnings = thisMonthBookings.reduce((sum, b) => sum + b.totalPrice, 0)
+  
+  const lastMonthBookings = completedBookings.filter(b => {
+    const bookingDate = new Date(b.date)
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1)
+    return bookingDate.getMonth() === lastMonth.getMonth() && 
+           bookingDate.getFullYear() === lastMonth.getFullYear()
+  })
+  const lastMonthEarnings = lastMonthBookings.reduce((sum, b) => sum + b.totalPrice, 0)
 
-  const handleExportCSV = () => {
-    const csv = [
-      ['Date', 'Student', 'Subject', 'Duration (min)', 'Amount', 'Status'],
-      ...filteredTransactions.map(txn => [
-        txn.date,
-        txn.studentName,
-        txn.subject,
-        txn.duration.toString(),
-        txn.amount.toFixed(2),
-        txn.status
-      ])
-    ].map(row => row.join(',')).join('\n')
+  const earningsChange = lastMonthEarnings > 0 
+    ? ((thisMonthEarnings - lastMonthEarnings) / lastMonthEarnings * 100).toFixed(1)
+    : 0
 
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `earnings-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    
-    toast.success('Earnings report downloaded')
-  }
+  // Weekly earnings for chart
+  const weeklyEarnings = [
+    { week: 'Week 1', amount: 320 },
+    { week: 'Week 2', amount: 450 },
+    { week: 'Week 3', amount: 380 },
+    { week: 'Week 4', amount: 520 },
+  ]
+  const maxEarnings = Math.max(...weeklyEarnings.map(w => w.amount))
 
-  const getStatusColor = (status: 'paid' | 'pending' | 'processing') => {
-    switch (status) {
-      case 'paid':
-        return 'default'
-      case 'pending':
-        return 'secondary'
-      case 'processing':
-        return 'outline'
-      default:
-        return 'outline'
-    }
+  // Recent transactions
+  const recentTransactions = completedBookings.slice(0, 10).map(b => ({
+    id: b.id,
+    student: b.studentId,
+    subject: b.subject,
+    amount: b.totalPrice,
+    date: b.date,
+    status: 'completed'
+  }))
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading earnings...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-secondary/30 py-8">
+    <div className="py-12">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-foreground mb-2">Earnings</h1>
           <p className="text-lg text-muted-foreground">
-            Track your income and transaction history
+            Track your tutoring income and payouts
           </p>
         </div>
 
-        {/* Earnings Summary Cards */}
+        {/* Stats */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="border-2 border-primary/20">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <DollarSign className="h-5 w-5 text-primary" />
-              </div>
+              <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">${totalEarnings.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                From {completedBookings.length} completed sessions
-              </p>
+              <div className="text-2xl font-bold">${totalEarnings.toFixed(2)}</div>
+              <p className="text-xs text-muted-foreground">All time</p>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">This Month</CardTitle>
-              <TrendingUp className="h-5 w-5 text-muted-foreground" />
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">${monthlyEarnings.toFixed(2)}</div>
+              <div className="text-2xl font-bold">${thisMonthEarnings.toFixed(2)}</div>
               <div className="flex items-center gap-1 mt-1">
-                <ArrowUpRight className="h-3 w-3 text-green-600" />
-                <p className="text-xs text-green-600 font-medium">
-                  +12% from last month
-                </p>
+                {Number(earningsChange) >= 0 ? (
+                  <TrendingUp className="h-3 w-3 text-green-500" />
+                ) : (
+                  <TrendingDown className="h-3 w-3 text-red-500" />
+                )}
+                <span className={`text-xs ${Number(earningsChange) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {earningsChange}% vs last month
+                </span>
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Pending</CardTitle>
-              <Clock className="h-5 w-5 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Sessions Completed</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">${pendingEarnings.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                From upcoming sessions
-              </p>
+              <div className="text-2xl font-bold">{completedBookings.length}</div>
+              <p className="text-xs text-muted-foreground">Total sessions</p>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Withdrawable</CardTitle>
-              <CreditCard className="h-5 w-5 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Avg. per Session</CardTitle>
+              <LineChart className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">${withdrawableEarnings.toFixed(2)}</div>
-              <Button size="sm" className="mt-2 w-full">
-                Withdraw
-              </Button>
+              <div className="text-2xl font-bold">
+                ${completedBookings.length > 0 ? (totalEarnings / completedBookings.length).toFixed(2) : '0.00'}
+              </div>
+              <p className="text-xs text-muted-foreground">Average earning</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Transaction History */}
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div>
-                <CardTitle>Transaction History</CardTitle>
-                <CardDescription>
-                  View all your earnings and payments
-                </CardDescription>
-              </div>
-              
-              <div className="flex flex-col sm:flex-row gap-2">
-                <div className="flex gap-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="from" className="text-xs">From</Label>
-                    <Input
-                      id="from"
-                      type="date"
-                      value={dateFilter.from}
-                      onChange={(e) => setDateFilter(prev => ({ ...prev, from: e.target.value }))}
-                      className="w-36"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="to" className="text-xs">To</Label>
-                    <Input
-                      id="to"
-                      type="date"
-                      value={dateFilter.to}
-                      onChange={(e) => setDateFilter(prev => ({ ...prev, to: e.target.value }))}
-                      className="w-36"
-                    />
-                  </div>
-                </div>
-                
-                <Button 
-                  variant="outline" 
-                  className="gap-2 self-end"
-                  onClick={handleExportCSV}
-                >
-                  <Download className="h-4 w-4" />
-                  Export CSV
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {/* Table Header */}
-            <div className="hidden md:grid md:grid-cols-6 gap-4 p-4 bg-muted/50 rounded-t-lg font-medium text-sm">
-              <div>Date</div>
-              <div>Student</div>
-              <div>Subject</div>
-              <div className="text-right">Duration</div>
-              <div className="text-right">Amount</div>
-              <div className="text-right">Status</div>
-            </div>
-
-            {/* Transaction Rows */}
-            <div className="divide-y">
-              {filteredTransactions.length > 0 ? (
-                filteredTransactions.map((txn) => (
-                  <div
-                    key={txn.id}
-                    className="grid md:grid-cols-6 gap-4 p-4 hover:bg-accent/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground md:hidden" />
-                      <div>
-                        <p className="font-medium md:font-normal">
-                          {new Date(txn.date).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                        </p>
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Weekly Earnings Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Weekly Earnings</CardTitle>
+                <CardDescription>Your earnings breakdown this month</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {weeklyEarnings.map((week) => (
+                    <div key={week.week} className="flex items-center gap-4">
+                      <div className="w-16 text-sm font-medium text-muted-foreground">
+                        {week.week}
+                      </div>
+                      <div className="flex-1">
+                        <div className="h-10 bg-secondary rounded-md overflow-hidden">
+                          <div
+                            className="h-full bg-primary flex items-center justify-end pr-3 text-sm font-medium text-primary-foreground transition-all"
+                            style={{ width: `${(week.amount / maxEarnings) * 100}%` }}
+                          >
+                            ${week.amount}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Recent Transactions */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Recent Transactions</CardTitle>
+                  <CardDescription>Your latest payments</CardDescription>
+                </div>
+                <Button variant="outline" size="sm">
+                  <Download className="mr-2 h-4 w-4" />
+                  Export
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {recentTransactions.length > 0 ? (
+                    recentTransactions.map((transaction) => (
+                      <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                            <ArrowUpRight className="h-5 w-5 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{transaction.subject}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {transaction.student} • {formatDate(transaction.date)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-green-600">+${transaction.amount.toFixed(2)}</p>
+                          <Badge variant="outline" className="text-xs">Completed</Badge>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No transactions yet</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Payout Info */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Payout Settings</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 bg-secondary/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-1">Available Balance</p>
+                  <p className="text-2xl font-bold">${thisMonthEarnings.toFixed(2)}</p>
+                </div>
+                <Button className="w-full">
+                  Request Payout
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  Payouts are processed within 3-5 business days
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Payment Method */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment Method</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-12 bg-blue-100 rounded flex items-center justify-center">
+                      <span className="text-xs font-bold text-blue-600">VISA</span>
+                    </div>
                     <div>
-                      <p className="text-sm md:text-base">{txn.studentName}</p>
-                    </div>
-                    
-                    <div>
-                      <p className="text-sm text-muted-foreground md:text-foreground">
-                        {txn.subject}
-                      </p>
-                    </div>
-                    
-                    <div className="md:text-right">
-                      <p className="text-sm text-muted-foreground md:text-foreground">
-                        {txn.duration} min
-                      </p>
-                    </div>
-                    
-                    <div className="md:text-right">
-                      <p className="font-semibold text-lg md:text-base">
-                        ${txn.amount.toFixed(2)}
-                      </p>
-                    </div>
-                    
-                    <div className="md:text-right">
-                      <Badge variant={getStatusColor(txn.status)} className="capitalize">
-                        {txn.status}
-                      </Badge>
+                      <p className="text-sm font-medium">•••• 4242</p>
+                      <p className="text-xs text-muted-foreground">Expires 12/25</p>
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-12">
-                  <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No transactions found</h3>
-                  <p className="text-muted-foreground">
-                    {dateFilter.from || dateFilter.to
-                      ? 'Try adjusting your date range'
-                      : 'Complete sessions to see your earnings here'}
-                  </p>
+                  <Badge variant="outline">Default</Badge>
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                <Button variant="outline" className="w-full">
+                  Update Payment Method
+                </Button>
+              </CardContent>
+            </Card>
 
-        {/* Payout Method Placeholder */}
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Payout Method</CardTitle>
-            <CardDescription>
-              Manage your payment settings
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-8">
-              <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground mb-4">
-                Payment integration coming soon. You'll be able to add bank accounts and cards.
-              </p>
-              <Button disabled>Add Payout Method</Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Tax Summary Placeholder */}
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Tax Summary</CardTitle>
-            <CardDescription>
-              Annual tax information
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-3 gap-6">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Year to Date Earnings</p>
-                <p className="text-2xl font-bold">${totalEarnings.toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Platform Fees (15%)</p>
-                <p className="text-2xl font-bold">${(totalEarnings * 0.15).toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Net Earnings</p>
-                <p className="text-2xl font-bold">${(totalEarnings * 0.85).toFixed(2)}</p>
-              </div>
-            </div>
-            <Button variant="outline" className="mt-6 gap-2">
-              <Download className="h-4 w-4" />
-              Download Tax Forms
-            </Button>
-          </CardContent>
-        </Card>
+            {/* Quick Stats */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Earnings Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">This Week</span>
+                  <span className="font-bold">$180.00</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Last Week</span>
+                  <span className="font-bold">$220.00</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">This Month</span>
+                  <span className="font-bold">${thisMonthEarnings.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Last Month</span>
+                  <span className="font-bold">${lastMonthEarnings.toFixed(2)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   )

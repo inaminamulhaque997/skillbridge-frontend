@@ -31,19 +31,32 @@ export default function TutorDashboardPage() {
   const [todayBookings, setTodayBookings] = useState<Booking[]>([])
   const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([])
   const [pendingRequests, setPendingRequests] = useState<Booking[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    if (user) {
-      const bookings = getTutorBookings(user.id)
-      const today = new Date().toISOString().split('T')[0]
-      const todaySessions = bookings.filter(b => b.date === today && b.status === 'upcoming')
-      const upcoming = getBookingsByStatus(user.id, 'upcoming', 'tutor')
+    const fetchBookings = async () => {
+      if (!user) return
       
-      setAllBookings(bookings)
-      setTodayBookings(todaySessions)
-      setUpcomingBookings(upcoming.slice(0, 5))
-      // Mock pending requests - in real app would be separate status
-      setPendingRequests([])
+      try {
+        const bookings = await getTutorBookings(user.id)
+        const today = new Date().toISOString().split('T')[0]
+        const todaySessions = bookings.filter(b => b.date === today && b.status === 'upcoming')
+        const upcoming = bookings.filter(b => b.status === 'upcoming')
+        
+        setAllBookings(bookings)
+        setTodayBookings(todaySessions)
+        setUpcomingBookings(upcoming.slice(0, 5))
+        // Mock pending requests - in real app would be separate status
+        setPendingRequests([])
+      } catch (error) {
+        console.error('[SkillBridge] Error fetching bookings:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    if (user) {
+      fetchBookings()
     }
   }, [user])
 
