@@ -1,169 +1,275 @@
-import { PlatformUser, SubjectCategory, PlatformStats } from '@/types/admin'
-import { getBookings } from './booking'
+import { apiClient } from '@/lib/api-client'
+import type { PlatformUser, SubjectCategory, PlatformStats } from '@/types/admin'
 
-// Mock users data
-const mockUsers: PlatformUser[] = [
-  {
-    id: 'user-1',
-    name: 'Sarah Chen',
-    email: 'sarah.chen@example.com',
-    role: 'tutor',
-    status: 'active',
-    joinedDate: '2024-01-15',
-    lastActive: '2024-02-15',
-    sessionsCount: 145,
-  },
-  {
-    id: 'user-2',
-    name: 'Alex Thompson',
-    email: 'alex.t@example.com',
-    role: 'student',
-    status: 'active',
-    joinedDate: '2024-02-01',
-    lastActive: '2024-02-15',
-    sessionsCount: 23,
-    totalSpent: 1035,
-  },
-  {
-    id: 'user-3',
-    name: 'Michael Rodriguez',
-    email: 'michael.r@example.com',
-    role: 'tutor',
-    status: 'active',
-    joinedDate: '2024-01-20',
-    lastActive: '2024-02-14',
-    sessionsCount: 98,
-  },
-  {
-    id: 'user-4',
-    name: 'Emma Davis',
-    email: 'emma.davis@example.com',
-    role: 'student',
-    status: 'active',
-    joinedDate: '2024-02-05',
-    lastActive: '2024-02-15',
-    sessionsCount: 15,
-    totalSpent: 900,
-  },
-  {
-    id: 'user-5',
-    name: 'David Kim',
-    email: 'david.kim@example.com',
-    role: 'tutor',
-    status: 'banned',
-    joinedDate: '2023-12-10',
-    lastActive: '2024-01-20',
-    sessionsCount: 45,
-  },
-]
-
-// Mock categories
-const mockCategories: SubjectCategory[] = [
-  { id: 'cat-1', name: 'Mathematics', icon: '🔢', description: 'Algebra, Calculus, Geometry', tutorCount: 45, status: 'active', order: 1 },
-  { id: 'cat-2', name: 'Science', icon: '🔬', description: 'Physics, Chemistry, Biology', tutorCount: 38, status: 'active', order: 2 },
-  { id: 'cat-3', name: 'Programming', icon: '💻', description: 'Web Dev, Python, Java', tutorCount: 52, status: 'active', order: 3 },
-  { id: 'cat-4', name: 'Languages', icon: '🗣️', description: 'English, Spanish, French', tutorCount: 29, status: 'active', order: 4 },
-  { id: 'cat-5', name: 'Business', icon: '💼', description: 'Marketing, Finance, Management', tutorCount: 18, status: 'active', order: 5 },
-]
-
-// Get all users
-export const getAllUsers = (): PlatformUser[] => {
-  return mockUsers
+// API Response types
+interface ApiResponse<T> {
+  success: boolean
+  statusCode: number
+  data: T
+  message: string
 }
 
-// Get user by ID
-export const getUserById = (id: string): PlatformUser | undefined => {
-  return mockUsers.find((user) => user.id === id)
+// Backend types
+interface BackendUser {
+  id: string
+  email: string
+  name: string
+  role: string
+  avatar?: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
 }
 
-// Get users by role
-export const getUsersByRole = (role: 'student' | 'tutor' | 'admin'): PlatformUser[] => {
-  return mockUsers.filter((user) => user.role === role)
-}
-
-// Get users by status
-export const getUsersByStatus = (status: 'active' | 'banned' | 'pending'): PlatformUser[] => {
-  return mockUsers.filter((user) => user.status === status)
-}
-
-// Ban user
-export const banUser = (userId: string, reason: string): boolean => {
-  console.log(`[v0] Banning user ${userId} for reason: ${reason}`)
-  return true
-}
-
-// Unban user
-export const unbanUser = (userId: string): boolean => {
-  console.log(`[v0] Unbanning user ${userId}`)
-  return true
-}
-
-// Delete user
-export const deleteUser = (userId: string): boolean => {
-  console.log(`[v0] Deleting user ${userId}`)
-  return true
-}
-
-// Update user role
-export const updateUserRole = (userId: string, newRole: 'student' | 'tutor' | 'admin'): boolean => {
-  console.log(`[v0] Updating user ${userId} role to ${newRole}`)
-  return true
-}
-
-// Get all categories
-export const getAllCategories = (): SubjectCategory[] => {
-  return mockCategories
-}
-
-// Add category
-export const addCategory = (category: Omit<SubjectCategory, 'id'>): SubjectCategory => {
-  const newCategory = {
-    ...category,
-    id: `cat-${Date.now()}`,
+// Paginated response wrapper
+interface PaginatedUsersResponse {
+  users: BackendUser[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
   }
-  console.log('[v0] Adding new category:', newCategory)
-  return newCategory
 }
 
-// Update category
-export const updateCategory = (id: string, updates: Partial<SubjectCategory>): boolean => {
-  console.log(`[v0] Updating category ${id}:`, updates)
-  return true
+interface PaginatedBookingsResponse {
+  bookings: any[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
 }
 
-// Delete category
-export const deleteCategory = (id: string): boolean => {
-  console.log(`[v0] Deleting category ${id}`)
-  return true
+interface BackendCategory {
+  id: string
+  name: string
+  description?: string
+  icon?: string
+  createdAt: string
 }
 
-// Toggle category status
-export const toggleCategoryStatus = (id: string): boolean => {
-  console.log(`[v0] Toggling category ${id} status`)
-  return true
+interface BackendStats {
+  totalUsers: number
+  activeUsers: number
+  totalTutors: number
+  activeTutors: number
+  totalStudents: number
+  activeStudents: number
+  totalBookings: number
+  todayBookings: number
+  weekBookings: number
+  monthBookings: number
+  totalRevenue: number
+  monthRevenue: number
 }
 
-// Get platform statistics
-export const getPlatformStats = (): PlatformStats => {
-  const bookings = getBookings()
-  const today = new Date().toISOString().split('T')[0]
-  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-
+// Map backend user to frontend format
+const mapBackendUser = (user: BackendUser): PlatformUser => {
   return {
-    totalUsers: mockUsers.length,
-    activeUsers: mockUsers.filter((u) => u.status === 'active').length,
-    totalTutors: mockUsers.filter((u) => u.role === 'tutor').length,
-    activeTutors: mockUsers.filter((u) => u.role === 'tutor' && u.status === 'active').length,
-    totalStudents: mockUsers.filter((u) => u.role === 'student').length,
-    activeStudents: mockUsers.filter((u) => u.role === 'student' && u.status === 'active').length,
-    totalBookings: bookings.length,
-    todayBookings: bookings.filter((b) => b.date === today).length,
-    weekBookings: bookings.filter((b) => b.date >= weekAgo).length,
-    monthBookings: bookings.filter((b) => b.date >= monthAgo).length,
-    totalRevenue: bookings.reduce((sum, b) => sum + b.totalPrice, 0),
-    monthRevenue: bookings.filter((b) => b.date >= monthAgo).reduce((sum, b) => sum + b.totalPrice, 0),
-    platformRating: 4.8,
-    completionRate: 94,
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role.toLowerCase() as 'student' | 'tutor' | 'admin',
+    status: user.isActive ? 'active' : 'banned',
+    avatar: user.avatar,
+    joinedDate: user.createdAt,
+    lastActive: user.updatedAt,
+  }
+}
+
+// Map backend category to frontend format
+const mapBackendCategory = (category: BackendCategory, tutorCount: number = 0): SubjectCategory => {
+  return {
+    id: category.id,
+    name: category.name,
+    icon: category.icon || '📚',
+    description: category.description || '',
+    tutorCount,
+    status: 'active',
+    order: 1,
+  }
+}
+
+/**
+ * Get all users (admin only)
+ */
+export const getAllUsers = async (): Promise<PlatformUser[]> => {
+  try {
+    const response = await apiClient.get<ApiResponse<PaginatedUsersResponse>>('/api/admin/users')
+    // Handle paginated response - backend returns { users: [], pagination: {} }
+    const users = response.data.users || response.data
+    if (Array.isArray(users)) {
+      return users.map(mapBackendUser)
+    }
+    return []
+  } catch (error) {
+    console.error('[SkillBridge] Error fetching users:', error)
+    throw error
+  }
+}
+
+/**
+ * Get user by ID
+ */
+export const getUserById = async (id: string): Promise<PlatformUser | null> => {
+  try {
+    const response = await apiClient.get<ApiResponse<BackendUser>>(`/api/admin/users/${id}`)
+    return mapBackendUser(response.data)
+  } catch (error) {
+    console.error('[SkillBridge] Error fetching user:', error)
+    return null
+  }
+}
+
+/**
+ * Update user (admin only)
+ */
+export const updateUser = async (userId: string, data: { isActive?: boolean; role?: string }): Promise<PlatformUser> => {
+  try {
+    const response = await apiClient.patch<ApiResponse<BackendUser>>(`/api/admin/users/${userId}`, data)
+    return mapBackendUser(response.data)
+  } catch (error) {
+    console.error('[SkillBridge] Error updating user:', error)
+    throw error
+  }
+}
+
+/**
+ * Ban user
+ */
+export const banUser = async (userId: string, reason?: string): Promise<boolean> => {
+  try {
+    await updateUser(userId, { isActive: false })
+    return true
+  } catch (error) {
+    console.error('[SkillBridge] Error banning user:', error)
+    return false
+  }
+}
+
+/**
+ * Unban user
+ */
+export const unbanUser = async (userId: string): Promise<boolean> => {
+  try {
+    await updateUser(userId, { isActive: true })
+    return true
+  } catch (error) {
+    console.error('[SkillBridge] Error unbanning user:', error)
+    return false
+  }
+}
+
+/**
+ * Delete user
+ */
+export const deleteUser = async (userId: string): Promise<boolean> => {
+  try {
+    await apiClient.delete(`/api/admin/users/${userId}`)
+    return true
+  } catch (error) {
+    console.error('[SkillBridge] Error deleting user:', error)
+    return false
+  }
+}
+
+/**
+ * Get all categories
+ */
+export const getAllCategories = async (): Promise<SubjectCategory[]> => {
+  try {
+    const response = await apiClient.get<ApiResponse<BackendCategory[]>>('/api/admin/categories')
+    return response.data.map((cat) => mapBackendCategory(cat))
+  } catch (error) {
+    console.error('[SkillBridge] Error fetching categories:', error)
+    throw error
+  }
+}
+
+/**
+ * Add category
+ */
+export const addCategory = async (category: Omit<SubjectCategory, 'id'>): Promise<SubjectCategory> => {
+  try {
+    const response = await apiClient.post<ApiResponse<BackendCategory>>('/api/admin/categories', {
+      name: category.name,
+      description: category.description,
+      icon: category.icon,
+    })
+    return mapBackendCategory(response.data, category.tutorCount)
+  } catch (error) {
+    console.error('[SkillBridge] Error adding category:', error)
+    throw error
+  }
+}
+
+/**
+ * Update category
+ */
+export const updateCategory = async (id: string, updates: Partial<SubjectCategory>): Promise<boolean> => {
+  try {
+    await apiClient.put(`/api/admin/categories/${id}`, updates)
+    return true
+  } catch (error) {
+    console.error('[SkillBridge] Error updating category:', error)
+    return false
+  }
+}
+
+/**
+ * Delete category
+ */
+export const deleteCategory = async (id: string): Promise<boolean> => {
+  try {
+    await apiClient.delete(`/api/admin/categories/${id}`)
+    return true
+  } catch (error) {
+    console.error('[SkillBridge] Error deleting category:', error)
+    return false
+  }
+}
+
+/**
+ * Toggle category status (active/inactive)
+ */
+export const toggleCategoryStatus = async (id: string): Promise<boolean> => {
+  try {
+    await apiClient.patch(`/api/admin/categories/${id}/toggle-status`)
+    return true
+  } catch (error) {
+    console.error('[SkillBridge] Error toggling category status:', error)
+    return false
+  }
+}
+
+/**
+ * Get platform statistics
+ */
+export const getPlatformStats = async (): Promise<PlatformStats> => {
+  try {
+    const response = await apiClient.get<ApiResponse<BackendStats>>('/api/admin/stats')
+    const stats = response.data
+    
+    return {
+      totalUsers: stats.totalUsers,
+      activeUsers: stats.activeUsers,
+      totalTutors: stats.totalTutors,
+      activeTutors: stats.activeTutors,
+      totalStudents: stats.totalStudents,
+      activeStudents: stats.activeStudents,
+      totalBookings: stats.totalBookings,
+      todayBookings: stats.todayBookings,
+      weekBookings: stats.weekBookings,
+      monthBookings: stats.monthBookings,
+      totalRevenue: stats.totalRevenue,
+      monthRevenue: stats.monthRevenue,
+      platformRating: 4.8, // Default value - would need separate endpoint
+      completionRate: 94, // Default value - would need separate endpoint
+    }
+  } catch (error) {
+    console.error('[SkillBridge] Error fetching stats:', error)
+    throw error
   }
 }
