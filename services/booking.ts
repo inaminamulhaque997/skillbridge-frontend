@@ -1,208 +1,232 @@
-import { Booking, CreateBookingData, BookingReview, BookingStatus } from '@/types/booking'
+import { apiClient } from '@/lib/api-client'
+import type { Booking, CreateBookingData, BookingReview, BookingStatus } from '@/types/booking'
+import { getStoredUser } from './auth'
 
-const BOOKINGS_STORAGE_KEY = 'skillbridge_bookings'
-const REVIEWS_STORAGE_KEY = 'skillbridge_reviews'
+// API Response types
+interface ApiResponse<T> {
+  success: boolean
+  statusCode: number
+  data: T
+  message: string
+}
 
-// Mock bookings data
-const mockBookings: Booking[] = [
-  {
-    id: 'booking-1',
-    studentId: '1', // Matches student@test.com
-    tutorId: '2',
-    tutorName: 'Sarah Chen',
-    tutorAvatar: '/placeholder.svg?height=80&width=80',
-    subject: 'Programming',
-    date: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
-    startTime: '14:00',
-    endTime: '15:30',
-    duration: 90,
-    hourlyRate: 45,
-    totalPrice: 67.5,
-    status: 'upcoming',
-    notes: 'Need help with React components and state management',
-    meetingLink: 'https://meet.skillbridge.com/session-1',
-    createdAt: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
-    updatedAt: new Date(Date.now() - 172800000).toISOString(),
-  },
-  {
-    id: 'booking-2',
-    studentId: '1', // Matches student@test.com
-    tutorId: '2',
-    tutorName: 'Emily Watson',
-    tutorAvatar: '/placeholder.svg?height=80&width=80',
-    subject: 'Mathematics',
-    date: new Date(Date.now() - 259200000).toISOString().split('T')[0], // 3 days ago
-    startTime: '10:00',
-    endTime: '11:00',
-    duration: 60,
-    hourlyRate: 35,
-    totalPrice: 35,
-    status: 'completed',
-    notes: 'Calculus tutoring',
-    meetingLink: 'https://meet.skillbridge.com/session-2',
-    createdAt: new Date(Date.now() - 604800000).toISOString(), // 7 days ago
-    updatedAt: new Date(Date.now() - 259200000).toISOString(),
-  },
-  {
-    id: 'booking-3',
-    studentId: '1', // Matches student@test.com
-    tutorId: '2',
-    tutorName: 'Michael Rodriguez',
-    tutorAvatar: '/placeholder.svg?height=80&width=80',
-    subject: 'Design',
-    date: new Date(Date.now() - 432000000).toISOString().split('T')[0], // 5 days ago
-    startTime: '16:00',
-    endTime: '17:00',
-    duration: 60,
-    hourlyRate: 40,
-    totalPrice: 40,
-    status: 'cancelled',
-    notes: 'UI/UX principles',
-    createdAt: new Date(Date.now() - 864000000).toISOString(), // 10 days ago
-    updatedAt: new Date(Date.now() - 432000000).toISOString(),
-  },
-]
-
-// Initialize mock data in localStorage
-const initializeMockData = () => {
-  if (typeof window === 'undefined') return
-
-  if (!localStorage.getItem(BOOKINGS_STORAGE_KEY)) {
-    localStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(mockBookings))
+// Backend booking type
+interface BackendBooking {
+  id: string
+  studentId: string
+  tutorId: string
+  date: string
+  startTime: string
+  endTime: string
+  status: string
+  price: number
+  notes?: string
+  createdAt: string
+  updatedAt: string
+  student?: {
+    id: string
+    name: string
+    avatar?: string
   }
-  if (!localStorage.getItem(REVIEWS_STORAGE_KEY)) {
-    localStorage.setItem(REVIEWS_STORAGE_KEY, JSON.stringify([]))
+  tutor?: {
+    id: string
+    name: string
+    avatar?: string
   }
 }
 
-// Get all bookings
-export const getBookings = (): Booking[] => {
-  if (typeof window === 'undefined') return []
-  
-  initializeMockData()
-  const stored = localStorage.getItem(BOOKINGS_STORAGE_KEY)
-  return stored ? JSON.parse(stored) : []
+// Map backend booking to frontend format
+const mapBackendBooking = (booking: BackendBooking): Booking => {
+  return {
+    id: booking.id,
+    studentId: booking.studentId,
+    tutorId: booking.tutorId,
+    tutorName: booking.tutor?.name || 'Unknown Tutor',
+    tutorAvatar: booking.tutor?.avatar,
+    subject: '', // Will be populated from tutor subjects if needed
+    date: booking.date,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+    duration: 60, // Default duration
+    hourlyRate: Number(booking.price),
+    totalPrice: Number(booking.price),
+    status: booking.status.toLowerCase() as BookingStatus,
+    notes: booking.notes,
+    meetingLink: undefined,
+    createdAt: booking.createdAt,
+    updatedAt: booking.updatedAt,
+  }
 }
 
-// Get bookings by student ID
-export const getStudentBookings = (studentId: string): Booking[] => {
-  return getBookings().filter((booking) => booking.studentId === studentId)
+/**
+ * Get all bookings for current user (student or tutor)
+ */
+export const getBookings = async (): Promise<Booking[]> => {
+  try {
+    const response = await apiClient.get<ApiResponse<{ bookings: BackendBooking[], pagination: { page: number, limit: number, total: number, totalPages: number } }>>('/api/bookings')
+    return response.data.bookings.map(mapBackendBooking)
+  } catch (error) {
+    console.error('[SkillBridge] Error fetching bookings:', error)
+    throw error
+  }
 }
 
-// Get bookings by tutor ID
-export const getTutorBookings = (tutorId: string): Booking[] => {
-  return getBookings().filter((booking) => booking.tutorId === tutorId)
+/**
+ * Get bookings by student ID
+ */
+export const getStudentBookings = async (studentId: string): Promise<Booking[]> => {
+  // The backend handles filtering by role, just call the endpoint
+  return getBookings()
 }
 
-// Get bookings by status
-export const getBookingsByStatus = (
+/**
+ * Get bookings by tutor ID
+ */
+export const getTutorBookings = async (tutorId: string): Promise<Booking[]> => {
+  // The backend handles filtering by role, just call the endpoint
+  return getBookings()
+}
+
+/**
+ * Get bookings by status
+ */
+export const getBookingsByStatus = async (
   userId: string,
   status: BookingStatus,
   userType: 'student' | 'tutor' = 'student'
-): Booking[] => {
-  const bookings = userType === 'tutor' ? getTutorBookings(userId) : getStudentBookings(userId)
+): Promise<Booking[]> => {
+  const bookings = await getBookings()
   return bookings.filter((booking) => booking.status === status)
 }
 
-// Create a new booking
-export const mockCreateBooking = async (
-  data: CreateBookingData,
-  studentId: string
+/**
+ * Create a new booking
+ */
+export const createBooking = async (
+  data: CreateBookingData
 ): Promise<Booking> => {
-  await new Promise((resolve) => setTimeout(resolve, 1000))
+  try {
+    // Convert startTime to 24-hour format if needed
+    const startTime24 = convertTo24HourFormat(data.startTime)
+    
+    // Calculate endTime from startTime and duration
+    const endTime = calculateEndTime(startTime24, data.duration)
+    
+    const response = await apiClient.post<ApiResponse<BackendBooking>>('/api/bookings', {
+      tutorId: data.tutorId,
+      date: data.date,
+      startTime: startTime24,
+      endTime: endTime,
+      notes: data.notes,
+    })
 
-  const bookings = getBookings()
-  
-  const endTime = calculateEndTime(data.startTime, data.duration)
-  const hourlyRate = 45 // Would come from tutor data
-  const totalPrice = (hourlyRate / 60) * data.duration
-
-  const newBooking: Booking = {
-    id: `booking-${Date.now()}`,
-    studentId,
-    tutorId: data.tutorId,
-    tutorName: 'Tutor Name', // Would come from tutor data
-    subject: data.subject,
-    date: data.date,
-    startTime: data.startTime,
-    endTime,
-    duration: data.duration,
-    hourlyRate,
-    totalPrice,
-    status: 'upcoming',
-    notes: data.notes,
-    meetingLink: `https://meet.skillbridge.com/session-${Date.now()}`,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    return mapBackendBooking(response.data)
+  } catch (error) {
+    console.error('[SkillBridge] Error creating booking:', error)
+    throw error
   }
-
-  bookings.push(newBooking)
-  localStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(bookings))
-
-  return newBooking
 }
 
-// Cancel a booking
-export const mockCancelBooking = async (bookingId: string): Promise<void> => {
-  await new Promise((resolve) => setTimeout(resolve, 800))
-
-  const bookings = getBookings()
-  const index = bookings.findIndex((b) => b.id === bookingId)
-
-  if (index === -1) {
-    throw new Error('Booking not found')
+/**
+ * Cancel a booking
+ */
+export const cancelBooking = async (bookingId: string): Promise<void> => {
+  try {
+    await apiClient.patch(`/api/bookings/${bookingId}/cancel`)
+  } catch (error) {
+    console.error('[SkillBridge] Error cancelling booking:', error)
+    throw error
   }
-
-  bookings[index].status = 'cancelled'
-  bookings[index].updatedAt = new Date().toISOString()
-
-  localStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(bookings))
 }
 
-// Submit a review
-export const mockSubmitReview = async (
-  review: Omit<BookingReview, 'id' | 'createdAt'>
+/**
+ * Update booking status (for tutors to accept/reject bookings)
+ */
+export const updateBookingStatus = async (
+  bookingId: string,
+  status: 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'
+): Promise<Booking> => {
+  try {
+    const response = await apiClient.patch<ApiResponse<BackendBooking>>(
+      `/api/bookings/${bookingId}/status`,
+      { status }
+    )
+    return mapBackendBooking(response.data)
+  } catch (error) {
+    console.error('[SkillBridge] Error updating booking status:', error)
+    throw error
+  }
+}
+
+/**
+ * Submit a review for a booking
+ */
+export const submitReview = async (
+  bookingId: string,
+  rating: number,
+  comment?: string,
+  isAnonymous: boolean = false
 ): Promise<BookingReview> => {
-  await new Promise((resolve) => setTimeout(resolve, 1000))
-
-  const reviews = getReviews()
-
-  const newReview: BookingReview = {
-    ...review,
-    id: `review-${Date.now()}`,
-    createdAt: new Date().toISOString(),
+  try {
+    const response = await apiClient.post<ApiResponse<BookingReview>>('/api/reviews', {
+      bookingId,
+      rating,
+      comment,
+      isAnonymous,
+    })
+    return response.data
+  } catch (error) {
+    console.error('[SkillBridge] Error submitting review:', error)
+    throw error
   }
-
-  reviews.push(newReview)
-  localStorage.setItem(REVIEWS_STORAGE_KEY, JSON.stringify(reviews))
-
-  // Mark booking as reviewed
-  const bookings = getBookings()
-  const bookingIndex = bookings.findIndex((b) => b.id === review.bookingId)
-  if (bookingIndex !== -1) {
-    bookings[bookingIndex].updatedAt = new Date().toISOString()
-    localStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(bookings))
-  }
-
-  return newReview
 }
 
-// Get reviews
-const getReviews = (): BookingReview[] => {
-  if (typeof window === 'undefined') return []
+/**
+ * Check if booking has been reviewed
+ */
+export const hasReviewed = async (bookingId: string): Promise<boolean> => {
+  try {
+    const response = await apiClient.get<ApiResponse<{ exists: boolean }>>(
+      `/api/reviews/booking/${bookingId}`
+    )
+    return response.data.exists
+  } catch {
+    return false
+  }
+}
+
+// Convert 12-hour time format (e.g., "09:00 AM") to 24-hour format (e.g., "09:00")
+const convertTo24HourFormat = (time: string): string => {
+  // If already in 24-hour format (HH:mm), return as is
+  if (/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time)) {
+    return time
+  }
   
-  initializeMockData()
-  const stored = localStorage.getItem(REVIEWS_STORAGE_KEY)
-  return stored ? JSON.parse(stored) : []
+  // Parse 12-hour format (e.g., "09:00 AM" or "02:30 PM")
+  const match = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+  if (!match) {
+    // If it doesn't match expected formats, try to extract just the time part
+    const timeOnly = time.replace(/\s*(AM|PM)$/i, '')
+    if (/^\d{1,2}:\d{2}$/.test(timeOnly)) {
+      return timeOnly
+    }
+    return time // Return as is if we can't parse
+  }
+  
+  let hours = parseInt(match[1], 10)
+  const minutes = match[2]
+  const period = match[3].toUpperCase()
+  
+  if (period === 'PM' && hours !== 12) {
+    hours += 12
+  } else if (period === 'AM' && hours === 12) {
+    hours = 0
+  }
+  
+  return `${hours.toString().padStart(2, '0')}:${minutes}`
 }
 
-// Check if booking has been reviewed
-export const hasReviewed = (bookingId: string): boolean => {
-  const reviews = getReviews()
-  return reviews.some((review) => review.bookingId === bookingId)
-}
-
-// Helper function to calculate end time
+// Helper functions (still useful for formatting)
 export const calculateEndTime = (startTime: string, durationMinutes: number): string => {
   const [hours, minutes] = startTime.split(':').map(Number)
   const totalMinutes = hours * 60 + minutes + durationMinutes
@@ -211,25 +235,6 @@ export const calculateEndTime = (startTime: string, durationMinutes: number): st
   return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`
 }
 
-// Update booking status - allows changing status of any booking
-export const updateBookingStatus = (bookingId: string, status: BookingStatus): Booking | null => {
-  const bookings = getBookings()
-  const bookingIndex = bookings.findIndex(b => b.id === bookingId)
-  
-  if (bookingIndex === -1) return null
-  
-  bookings[bookingIndex].status = status
-  localStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(bookings))
-  
-  return bookings[bookingIndex]
-}
-
-// Cancel booking
-export const cancelBooking = (bookingId: string): Booking | null => {
-  return updateBookingStatus(bookingId, 'cancelled')
-}
-
-// Format time for display
 export const formatTime = (time: string): string => {
   const [hours, minutes] = time.split(':').map(Number)
   const period = hours >= 12 ? 'PM' : 'AM'
@@ -237,7 +242,6 @@ export const formatTime = (time: string): string => {
   return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`
 }
 
-// Format date for display
 export const formatDate = (date: string): string => {
   const d = new Date(date)
   return d.toLocaleDateString('en-US', {
@@ -248,13 +252,11 @@ export const formatDate = (date: string): string => {
   })
 }
 
-// Check if booking is today
 export const isToday = (date: string): boolean => {
   const today = new Date().toISOString().split('T')[0]
   return date === today
 }
 
-// Get time until booking
 export const getTimeUntilBooking = (date: string, startTime: string): string => {
   const bookingDateTime = new Date(`${date}T${startTime}:00`)
   const now = new Date()
@@ -270,4 +272,11 @@ export const getTimeUntilBooking = (date: string, startTime: string): string => 
 
   const days = Math.floor(hours / 24)
   return `in ${days}d`
+}
+
+// Keep mock functions for backward compatibility during transition
+export const mockCreateBooking = createBooking
+export const mockCancelBooking = cancelBooking
+export const mockSubmitReview = async (review: Omit<BookingReview, 'id' | 'createdAt'>): Promise<BookingReview> => {
+  return submitReview(review.bookingId, review.rating, review.comment, review.isAnonymous)
 }
