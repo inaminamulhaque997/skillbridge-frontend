@@ -9,27 +9,41 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { getStudentBookings, getBookingsByStatus, formatDate, formatTime, getTimeUntilBooking, isToday } from '@/services/booking'
 import { Booking } from '@/types/booking'
-import { Calendar, Clock, BookOpen, TrendingUp, ArrowRight, Video, MessageSquare } from 'lucide-react'
+import { Calendar, Clock, BookOpen, TrendingUp, ArrowRight, Video, MessageSquare, Loader2 } from 'lucide-react'
 
 export default function StudentDashboardPage() {
   const { user } = useAuth()
   const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([])
   const [allBookings, setAllBookings] = useState<Booking[]>([])
   const [nextSession, setNextSession] = useState<Booking | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    if (user) {
-      const bookings = getStudentBookings(user.id)
-      const upcoming = getBookingsByStatus(user.id, 'upcoming')
-        .sort((a, b) => {
-          const dateA = new Date(`${a.date}T${a.startTime}`)
-          const dateB = new Date(`${b.date}T${b.startTime}`)
-          return dateA.getTime() - dateB.getTime()
-        })
+    const fetchBookings = async () => {
+      if (!user) return
       
-      setAllBookings(bookings)
-      setUpcomingBookings(upcoming.slice(0, 3))
-      setNextSession(upcoming[0] || null)
+      try {
+        const bookings = await getStudentBookings(user.id)
+        const upcoming = bookings
+          .filter((b) => b.status === 'upcoming')
+          .sort((a, b) => {
+            const dateA = new Date(`${a.date}T${a.startTime}`)
+            const dateB = new Date(`${b.date}T${b.startTime}`)
+            return dateA.getTime() - dateB.getTime()
+          })
+        
+        setAllBookings(bookings)
+        setUpcomingBookings(upcoming.slice(0, 3))
+        setNextSession(upcoming[0] || null)
+      } catch (error) {
+        console.error('[SkillBridge] Error fetching bookings:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    if (user) {
+      fetchBookings()
     }
   }, [user])
 
@@ -39,6 +53,21 @@ export default function StudentDashboardPage() {
     .reduce((sum, b) => sum + b.duration / 60, 0)
   
   const uniqueTutors = new Set(allBookings.map(b => b.tutorId)).size
+
+  if (isLoading) {
+    return (
+      <div className="py-12">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+              <p className="text-muted-foreground">Loading your dashboard...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="py-12">

@@ -49,18 +49,45 @@ export default function BookingsPage() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [bookingToCancel, setBookingToCancel] = useState<string | null>(null)
   const [isCancelling, setIsCancelling] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
-  const loadBookings = () => {
-    if (user) {
-      setUpcomingBookings(getBookingsByStatus(user.id, 'upcoming'))
-      setCompletedBookings(getBookingsByStatus(user.id, 'completed'))
-      setCancelledBookings(getBookingsByStatus(user.id, 'cancelled'))
+  const loadBookings = async () => {
+    if (!user) return
+    
+    try {
+      setIsLoading(true)
+      const bookings = await getBookingsByStatus(user.id, 'upcoming')
+      const completed = await getBookingsByStatus(user.id, 'completed')
+      const cancelled = await getBookingsByStatus(user.id, 'cancelled')
+      
+      setUpcomingBookings(bookings)
+      setCompletedBookings(completed)
+      setCancelledBookings(cancelled)
+    } catch (error) {
+      console.error('[SkillBridge] Error loading bookings:', error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
   useEffect(() => {
     loadBookings()
   }, [user])
+
+  if (isLoading) {
+    return (
+      <div className="py-8">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading your bookings...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const handleCancelBooking = async () => {
     if (!bookingToCancel) return
