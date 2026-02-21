@@ -1,4 +1,5 @@
 import { User, UserRole } from '@/types/auth'
+import { apiClient } from '@/lib/api-client'
 
 // Type definitions for auth service
 export interface RegisterData {
@@ -33,225 +34,146 @@ export interface AuthError {
   field?: string
 }
 
-// Mock database of users
-const MOCK_USERS: Record<string, User & { password: string }> = {
-  'student@test.com': {
-    id: '1',
-    email: 'student@test.com',
-    name: 'Sarah Johnson',
-    role: 'student',
-    avatar: '/placeholder.svg?height=40&width=40',
-    password: 'password123',
-  },
-  'tutor@test.com': {
-    id: '2',
-    email: 'tutor@test.com',
-    name: 'Michael Rodriguez',
-    role: 'tutor',
-    avatar: '/placeholder.svg?height=40&width=40',
-    password: 'password123',
-  },
-  'admin@skillbridge.com': {
-    id: '3',
-    email: 'admin@skillbridge.com',
-    name: 'Admin User',
-    role: 'admin',
-    avatar: '/placeholder.svg?height=40&width=40',
-    password: 'admin123',
-  },
-}
-
 // Storage keys
 const STORAGE_KEYS = {
   USER: 'skillbridge_user',
   TOKEN: 'skillbridge_token',
-  REGISTERED_USERS: 'skillbridge_registered_users',
 }
 
-// Helper: Get all users (including dynamically registered ones)
-const getAllUsers = (): Record<string, User & { password: string }> => {
-  if (typeof window === 'undefined') return MOCK_USERS
-
-  const stored = localStorage.getItem(STORAGE_KEYS.REGISTERED_USERS)
-  const registeredUsers = stored ? JSON.parse(stored) : {}
-  return { ...MOCK_USERS, ...registeredUsers }
-}
-
-// Helper: Save registered users
-const saveRegisteredUser = (email: string, user: User & { password: string }) => {
-  if (typeof window === 'undefined') return
-
-  const allUsers = getAllUsers()
-  allUsers[email] = user
-  
-  // Only save non-default users
-  const { [email]: _, ...defaultUsers } = MOCK_USERS
-  const customUsers = Object.keys(allUsers)
-    .filter((key) => !Object.keys(defaultUsers).includes(key))
-    .reduce((acc, key) => {
-      acc[key] = allUsers[key]
-      return acc
-    }, {} as Record<string, User & { password: string }>)
-
-  localStorage.setItem(STORAGE_KEYS.REGISTERED_USERS, JSON.stringify(customUsers))
-}
-
-// Helper: Generate mock token
-const generateToken = (user: User): string => {
-  return `mock_token_${user.id}_${Date.now()}`
-}
-
-// Helper: Simulate network delay
-const simulateDelay = (ms: number = 1000): Promise<void> => {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-/**
- * Mock user registration
- * Simulates API call with validation and error handling
- */
-export const mockRegister = async (data: RegisterData): Promise<AuthResponse> => {
-  await simulateDelay(1000)
-
-  // Validation
-  if (!data.email || !data.fullName || !data.password) {
-    throw new Error('All required fields must be filled')
-  }
-
-  if (data.password.length < 8) {
-    throw new Error('Password must be at least 8 characters long')
-  }
-
-  if (data.password !== data.confirmPassword) {
-    throw new Error('Passwords do not match')
-  }
-
-  // Email validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(data.email)) {
-    throw new Error('Please enter a valid email address')
-  }
-
-  // Check if user already exists
-  const allUsers = getAllUsers()
-  if (allUsers[data.email]) {
-    throw new Error('An account with this email already exists')
-  }
-
-  // Role-specific validation
-  if (data.role === 'student' && !data.educationLevel) {
-    throw new Error('Education level is required for students')
-  }
-
-  if (data.role === 'tutor') {
-    if (!data.expertise) {
-      throw new Error('Expertise is required for tutors')
+// API Response types (matching backend ApiResponse format)
+interface ApiAuthResponse {
+  success: boolean
+  statusCode: number
+  data: {
+    user: {
+      id: string
+      email: string
+      name: string
+      role: string
+      avatar?: string
     }
-    if (!data.experience) {
-      throw new Error('Experience is required for tutors')
-    }
-    if (!data.hourlyRate || isNaN(Number(data.hourlyRate))) {
-      throw new Error('Valid hourly rate is required for tutors')
+    token: string
+  }
+  message: string
+}
+
+interface ApiUserResponse {
+  success: boolean
+  statusCode: number
+  data: {
+    user: {
+      id: string
+      email: string
+      name: string
+      role: string
+      avatar?: string
     }
   }
+  message: string
+}
 
-  // Create new user
-  const newUser: User & { password: string } = {
-    id: `user_${Date.now()}`,
-    email: data.email,
-    name: data.fullName,
-    role: data.role,
-    avatar: '/placeholder.svg?height=40&width=40',
-    password: data.password,
-  }
-
-  // Save to "database"
-  saveRegisteredUser(data.email, newUser)
-
-  // Generate token
-  const token = generateToken(newUser)
-
-  // Store auth data
-  if (typeof window !== 'undefined') {
-    const { password, ...userWithoutPassword } = newUser
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userWithoutPassword))
-    localStorage.setItem(STORAGE_KEYS.TOKEN, token)
-  }
-
-  const { password: _, ...userResponse } = newUser
+// Helper: Map backend user to frontend user format
+const mapBackendUser = (backendUser: ApiAuthResponse['data']['user']): User => {
   return {
-    user: userResponse,
-    token,
+    id: backendUser.id,
+    email: backendUser.email,
+    name: backendUser.name,
+    role: backendUser.role.toLowerCase() as UserRole,
+    avatar: backendUser.avatar || '/placeholder.svg?height=40&width=40',
   }
 }
 
 /**
- * Mock user login
- * Simulates API call with authentication
+ * User registration
+ * Calls the backend API
  */
-export const mockLogin = async (
-  credentials: LoginCredentials
-): Promise<AuthResponse> => {
-  await simulateDelay(1000)
+export const register = async (data: RegisterData): Promise<AuthResponse> => {
+  try {
+    // Map frontend role to backend format (uppercase)
+    const roleMap: Record<UserRole, string> = {
+      student: 'STUDENT',
+      tutor: 'TUTOR',
+      admin: 'ADMIN',
+    }
 
-  // Validation
-  if (!credentials.email || !credentials.password) {
-    throw new Error('Email and password are required')
-  }
+    const response = await apiClient.post<ApiAuthResponse>('/api/auth/register', {
+      name: data.fullName,
+      email: data.email,
+      password: data.password,
+      role: roleMap[data.role],
+    })
 
-  // Check if user exists
-  const allUsers = getAllUsers()
-  const user = allUsers[credentials.email]
+    const { user, token } = response.data
 
-  if (!user) {
-    throw new Error('Invalid email or password')
-  }
+    // Store auth data
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(mapBackendUser(user)))
+      localStorage.setItem(STORAGE_KEYS.TOKEN, token)
+    }
 
-  // Verify password
-  if (user.password !== credentials.password) {
-    throw new Error('Invalid email or password')
-  }
-
-  // Verify role if specified
-  if (credentials.role && user.role !== credentials.role) {
-    throw new Error(`This account is registered as a ${user.role}, not a ${credentials.role}`)
-  }
-
-  // Generate token
-  const token = generateToken(user)
-
-  // Store auth data
-  if (typeof window !== 'undefined') {
-    const { password, ...userWithoutPassword } = user
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userWithoutPassword))
-    localStorage.setItem(STORAGE_KEYS.TOKEN, token)
-  }
-
-  const { password: _, ...userResponse } = user
-  return {
-    user: userResponse,
-    token,
+    return {
+      user: mapBackendUser(user),
+      token,
+    }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Registration failed'
+    throw new Error(message)
   }
 }
 
 /**
- * Mock logout
- * Clears stored authentication data
+ * User login
+ * Calls the backend API
  */
-export const mockLogout = async (): Promise<void> => {
-  await simulateDelay(300)
+export const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
+  try {
+    const response = await apiClient.post<ApiAuthResponse>('/api/auth/login', {
+      email: credentials.email,
+      password: credentials.password,
+    })
 
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(STORAGE_KEYS.USER)
-    localStorage.removeItem(STORAGE_KEYS.TOKEN)
+    const { user, token } = response.data
+
+    // Store auth data
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(mapBackendUser(user)))
+      localStorage.setItem(STORAGE_KEYS.TOKEN, token)
+    }
+
+    return {
+      user: mapBackendUser(user),
+      token,
+    }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Login failed'
+    throw new Error(message)
+  }
+}
+
+/**
+ * Logout
+ * Clears stored authentication data and calls backend to clear cookie
+ */
+export const logout = async (): Promise<void> => {
+  try {
+    // Call backend to clear the HTTP-only cookie
+    await apiClient.post('/api/auth/logout')
+  } catch (error) {
+    console.error('[SkillBridge] Error during logout:', error)
+  } finally {
+    // Always clear local storage
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEYS.USER)
+      localStorage.removeItem(STORAGE_KEYS.TOKEN)
+    }
   }
 }
 
 /**
  * Get current authenticated user
- * Returns user from storage or null if not authenticated
+ * Returns user from storage or fetches from API
  */
-export const mockGetCurrentUser = (): User | null => {
+export const getCurrentUser = async (): Promise<User | null> => {
   if (typeof window === 'undefined') return null
 
   try {
@@ -262,10 +184,37 @@ export const mockGetCurrentUser = (): User | null => {
       return null
     }
 
+    // Optionally verify with backend
+    try {
+      const response = await apiClient.get<ApiUserResponse>('/api/auth/me')
+      const user = mapBackendUser(response.data.user)
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user))
+      return user
+    } catch {
+      // If API call fails, return stored user
+      const user: User = JSON.parse(userStr)
+      return user
+    }
+  } catch (error) {
+    console.error('[SkillBridge] Error getting current user:', error)
+    return null
+  }
+}
+
+/**
+ * Get stored user (sync version)
+ */
+export const getStoredUser = (): User | null => {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const userStr = localStorage.getItem(STORAGE_KEYS.USER)
+    if (!userStr) return null
+
     const user: User = JSON.parse(userStr)
     return user
   } catch (error) {
-    console.error('[v0] Error getting current user:', error)
+    console.error('[SkillBridge] Error getting stored user:', error)
     return null
   }
 }
@@ -284,7 +233,7 @@ export const isAuthenticated = (): boolean => {
  * Verify user has required role
  */
 export const hasRole = (requiredRole: UserRole): boolean => {
-  const user = mockGetCurrentUser()
+  const user = getStoredUser()
   return user?.role === requiredRole
 }
 
@@ -296,7 +245,14 @@ export const getToken = (): string | null => {
   return localStorage.getItem(STORAGE_KEYS.TOKEN)
 }
 
-// Export mock users for testing reference
+// Keep mock functions for backward compatibility during transition
+// These will be replaced by the real functions above
+export const mockRegister = register
+export const mockLogin = login
+export const mockLogout = logout
+export const mockGetCurrentUser = getStoredUser
+
+// Export mock test users for reference
 export const MOCK_TEST_USERS = {
   student: {
     email: 'student@test.com',
