@@ -109,7 +109,7 @@ export function Navbar() {
                       const Icon = link.icon
                       return (
                         <DropdownMenuItem key={link.href} asChild>
-                          <Link href={link.href} className="flex items-center cursor-pointer">
+                          <Link href={link.href} className="flex items-center cursor-pointer w-full" onClick={() => setIsMenuOpen(false)}>
                             <Icon className="mr-2 h-4 w-4" />
                             <span>{link.label}</span>
                           </Link>

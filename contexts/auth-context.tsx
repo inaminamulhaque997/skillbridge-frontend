@@ -45,13 +45,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(response.user)
 
       // Redirect based on role
+      let redirectPath = '/dashboard'
       if (response.user.role === 'admin') {
-        router.push('/admin')
+        redirectPath = '/admin'
       } else if (response.user.role === 'tutor') {
-        router.push('/tutor/dashboard')
-      } else {
-        router.push('/dashboard')
+        redirectPath = '/tutor/dashboard'
       }
+      
+      // Use window.location for a full page navigation to ensure redirect works
+      window.location.href = redirectPath
     } catch (error) {
       throw error
     }
