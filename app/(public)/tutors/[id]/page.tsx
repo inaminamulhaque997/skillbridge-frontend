@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { StarRating } from '@/components/star-rating'
 import { BookingModal } from '@/components/booking-modal'
 import { useAuth } from '@/contexts/auth-context'
-import { sampleTutorProfile } from '@/data/tutor-profile'
+import { sampleTutorProfile, type DayAvailability } from '@/data/tutor-profile'
 import { toast } from 'sonner'
 import {
   Star,
@@ -27,6 +27,44 @@ import {
   GraduationCap,
 } from 'lucide-react'
 
+// Generate dynamic availability based on current date
+const generateDynamicAvailability = (weekOffset: number = 0): DayAvailability[] => {
+  const days: DayAvailability[] = []
+  const today = new Date()
+  const startOffset = weekOffset * 7
+  
+  const timeSlots = [
+    { time: '09:00 AM', available: true },
+    { time: '10:00 AM', available: true },
+    { time: '11:00 AM', available: true },
+    { time: '02:00 PM', available: true },
+    { time: '03:00 PM', available: true },
+    { time: '04:00 PM', available: true },
+  ]
+  
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(today)
+    date.setDate(today.getDate() + startOffset + i)
+    
+    // Randomly mark some slots as unavailable for variety
+    const slots = timeSlots.map(slot => ({
+      ...slot,
+      available: Math.random() > 0.3 // 70% chance of being available
+    }))
+    
+    days.push({
+      date: date.toISOString().split('T')[0],
+      day: date.getDate().toString(),
+      dayOfWeek: dayNames[date.getDay()],
+      slots,
+    })
+  }
+  
+  return days
+}
+
 export default function TutorProfilePage() {
   const params = useParams()
   const router = useRouter()
@@ -42,10 +80,8 @@ export default function TutorProfilePage() {
   // In a real app, fetch tutor by ID from params.id
   const tutor = sampleTutorProfile
 
-  const currentWeekAvailability = tutor.availability.slice(
-    weekOffset * 7,
-    weekOffset * 7 + 7
-  )
+  // Generate dynamic availability based on current date
+  const currentWeekAvailability = useMemo(() => generateDynamicAvailability(weekOffset), [weekOffset])
 
   const handleTimeSlotClick = (date: string, time: string) => {
     setSelectedDate(date)
@@ -513,7 +549,7 @@ export default function TutorProfilePage() {
           selectedTime={selectedTime}
           duration={duration * 60} // Convert hours to minutes
           hourlyRate={tutor.hourlyRate}
-          subjects={tutor.subjects.map(s => s.name)}
+          subjects={tutor.subjects}
           studentId={user.id}
         />
       )}

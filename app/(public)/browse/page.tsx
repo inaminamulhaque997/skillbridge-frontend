@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Slider } from '@/components/ui/slider'
 import { TutorCardEnhanced } from '@/components/tutor-card-enhanced'
 import { mockTutors } from '@/data/mock-tutors'
+import { getTutors, Tutor } from '@/services/tutor'
 import { Search, SlidersHorizontal, X } from 'lucide-react'
 
 type SortOption = 'rating' | 'price-low' | 'price-high' | 'newest'
@@ -21,19 +22,38 @@ export default function BrowseTutorsPage() {
   const [selectedAvailability, setSelectedAvailability] = useState<string[]>([])
   const [sortBy, setSortBy] = useState<SortOption>('rating')
   const [showFilters, setShowFilters] = useState(false)
+  const [tutors, setTutors] = useState<Tutor[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Fetch tutors from API on mount
+  useEffect(() => {
+    const fetchTutors = async () => {
+      try {
+        const data = await getTutors()
+        setTutors(data)
+      } catch (error) {
+        console.error('[SkillBridge] Error fetching tutors:', error)
+        // Fall back to mock data
+        setTutors(mockTutors)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchTutors()
+  }, [])
 
   // Extract unique subjects from all tutors
   const allSubjects = useMemo(() => {
     const subjects = new Set<string>()
-    mockTutors.forEach((tutor) => {
+    tutors.forEach((tutor) => {
       tutor.subjects.forEach((subject) => subjects.add(subject))
     })
     return Array.from(subjects).sort()
-  }, [])
+  }, [tutors])
 
   // Filter and sort tutors
   const filteredTutors = useMemo(() => {
-    let filtered = mockTutors.filter((tutor) => {
+    let filtered = tutors.filter((tutor) => {
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase()
@@ -275,7 +295,7 @@ export default function BrowseTutorsPage() {
             {/* Results Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <p className="text-sm text-muted-foreground">
-                Showing {filteredTutors.length} of {mockTutors.length} tutors
+                {isLoading ? 'Loading tutors...' : `Showing ${filteredTutors.length} of ${tutors.length} tutors`}
               </p>
               <div className="flex items-center gap-2">
                 <Label htmlFor="sort" className="text-sm whitespace-nowrap">
