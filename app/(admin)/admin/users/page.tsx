@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,13 +33,29 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import { StatusBadge } from '@/components/admin/status-badge'
 import { ConfirmModal } from '@/components/admin/confirm-modal'
-import { getAllUsers, banUser, unbanUser, deleteUser, updateUserRole } from '@/services/admin'
+import { getAllUsers, banUser, unbanUser, deleteUser } from '@/services/admin'
 import { PlatformUser } from '@/types/admin'
-import { Search, Download, Ban, CheckCircle, Trash2, Edit, Eye } from 'lucide-react'
+import { Search, Download, Ban, CheckCircle, Trash2, Edit, Eye, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function AdminUsersPage() {
-  const [users] = useState<PlatformUser[]>(getAllUsers())
+  const [users, setUsers] = useState<PlatformUser[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const data = await getAllUsers()
+        setUsers(data)
+      } catch (error) {
+        console.error('[SkillBridge] Error fetching users:', error)
+        toast.error('Failed to load users')
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchUsers()
+  }, [])
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -229,7 +245,14 @@ export default function AdminUsersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedUsers.length > 0 ? (
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                        <p className="text-muted-foreground mt-2">Loading users...</p>
+                      </TableCell>
+                    </TableRow>
+                  ) : paginatedUsers.length > 0 ? (
                     paginatedUsers.map((user) => (
                       <TableRow key={user.id}>
                         <TableCell>

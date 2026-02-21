@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -36,7 +36,7 @@ import { Search, Eye, X, DollarSign } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function AdminBookingsPage() {
-  const [bookings] = useState<Booking[]>(getBookings())
+  const [bookings, setBookings] = useState<Booking[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [viewBookingModal, setViewBookingModal] = useState<Booking | null>(null)
@@ -45,8 +45,23 @@ export default function AdminBookingsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [sortColumn, setSortColumn] = useState<keyof Booking>('date')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Filter and sort bookings
+  useEffect(() => {
+    const fetchBookings = async () => {
+      try {
+        const data = await getBookings()
+        setBookings(data)
+      } catch (error) {
+        console.error('[SkillBridge] Error fetching bookings:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchBookings()
+  }, [])
+
+  // Filter and sort bookings - must be before any early returns
   const filteredBookings = useMemo(() => {
     let filtered = bookings.filter((booking) => {
       const matchesSearch =
@@ -61,8 +76,8 @@ export default function AdminBookingsPage() {
 
     // Sort
     filtered.sort((a, b) => {
-      let aVal = a[sortColumn]
-      let bVal = b[sortColumn]
+      let aVal: any = a[sortColumn]
+      let bVal: any = b[sortColumn]
 
       if (sortColumn === 'date') {
         aVal = new Date(`${a.date}T${a.startTime}`).getTime()
@@ -102,6 +117,21 @@ export default function AdminBookingsPage() {
 
   const handleRefund = (booking: Booking) => {
     toast.success(`Refund of $${booking.totalPrice} initiated for booking ${booking.id}`)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-secondary/30 py-8">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center h-[60vh]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading bookings...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -148,7 +178,8 @@ export default function AdminBookingsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="upcoming">Upcoming</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="confirmed">Confirmed</SelectItem>
                     <SelectItem value="completed">Completed</SelectItem>
                     <SelectItem value="cancelled">Cancelled</SelectItem>
                   </SelectContent>
