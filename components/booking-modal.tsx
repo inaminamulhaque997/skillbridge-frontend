@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { mockCreateBooking, formatDate, formatTime } from '@/services/booking'
+import { createBooking, formatDate, formatTime } from '@/services/booking'
 import { Loader2, Calendar, Clock, DollarSign } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -58,17 +58,14 @@ export function BookingModal({
     setIsLoading(true)
 
     try {
-      await mockCreateBooking(
-        {
-          tutorId,
-          date: selectedDate,
-          startTime: selectedTime,
-          duration,
-          subject: selectedSubject,
-          notes: notes.trim() || undefined,
-        },
-        studentId
-      )
+      await createBooking({
+        tutorId,
+        date: selectedDate,
+        startTime: selectedTime,
+        duration,
+        subject: selectedSubject,
+        notes: notes.trim() || undefined,
+      })
 
       toast.success('Booking confirmed!', {
         description: `Your session with ${tutorName} has been scheduled.`,
