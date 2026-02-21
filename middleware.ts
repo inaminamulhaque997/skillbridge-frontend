@@ -1,32 +1,12 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// Routes that require authentication
-const protectedRoutes = ['/dashboard', '/tutor', '/admin']
-const publicRoutes = ['/', '/login', '/register', '/browse']
+// Note: Authentication is handled by protected-layout.tsx using localStorage
+// Middleware cannot reliably check auth via cookies due to cross-origin limitations
+// (Frontend and Backend are on different Vercel domains)
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
-
-  // Check if the route is protected
-  const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
-  const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith('/browse'))
-
-  // Get auth token from HTTP-only cookie set by backend
-  const token = request.cookies.get('skillbridge_token')?.value
-
-  // If trying to access protected route without token, redirect to login
-  if (isProtectedRoute && !token) {
-    const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('redirect', pathname)
-    return NextResponse.redirect(loginUrl)
-  }
-
-  // If authenticated user tries to access login/register, redirect to dashboard
-  if (token && (pathname === '/login' || pathname === '/register')) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  }
-
+  // Allow all requests through - auth is handled client-side by protected-layout.tsx
   return NextResponse.next()
 }
 
